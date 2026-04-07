@@ -257,7 +257,6 @@ if ($imagesManquantes.Count -gt 0) {
 }
 
 function Show-BeneficiaireDialog {
-    param([string]$defaultOU = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudMobilitesTechnologies/Utilisateurs")
     $dlg = New-Object Windows.Forms.Form
     $dlg.Text = "Informations bénéficiaire"
     $dlg.Size = New-Object Drawing.Size(650, 280)
@@ -294,11 +293,25 @@ function Show-BeneficiaireDialog {
     $lblOU.Location = New-Object Drawing.Point(25, 115); $lblOU.AutoSize = $true
     $lblOU.ForeColor = $cTextSecondary
 
-    $txtOU = New-Object Windows.Forms.TextBox
-    $txtOU.Location = New-Object Drawing.Point(25, 138); $txtOU.Width = 585
-    $txtOU.Text = $defaultOU
-    $txtOU.BackColor = $cSurface; $txtOU.ForeColor = $cTextPrimary
-    $txtOU.BorderStyle = 'FixedSingle'; $txtOU.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $cboOU = New-Object Windows.Forms.ComboBox
+    $cboOU.Location = New-Object Drawing.Point(25, 138); $cboOU.Width = 585
+    $cboOU.BackColor = $cSurface; $cboOU.ForeColor = $cTextPrimary
+    $cboOU.FlatStyle = 'Flat'
+    $cboOU.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $cboOU.DropDownStyle = 'DropDownList'
+    $ouList = @(
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/GaresEtConnexions/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/HEXAFRET/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/OPTIMSERVICES/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SARESEAU/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SASNCF/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SAVOYAGEURS/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudAzur/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudMobilitesTechnologies/Utilisateurs",
+        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/TECHNIS/Utilisateurs"
+    )
+    $cboOU.Items.AddRange($ouList)
+    $cboOU.SelectedIndex = 7
 
     $bp = New-Object Windows.Forms.Panel
     $bp.Dock = "Bottom"; $bp.Height = 55; $bp.BackColor = $cBgSecondary
@@ -329,10 +342,10 @@ function Show-BeneficiaireDialog {
     $btnCancel.Cursor = [Windows.Forms.Cursors]::Hand
     $bp.Controls.Add($btnCancel); $dlg.CancelButton = $btnCancel
 
-    $dlg.Controls.AddRange(@($bar, $lblT, $lblEmailB, $txtEmailB, $lblOU, $txtOU, $bp))
+    $dlg.Controls.AddRange(@($bar, $lblT, $lblEmailB, $txtEmailB, $lblOU, $cboOU, $bp))
     $result = $dlg.ShowDialog()
     if ($result -eq [Windows.Forms.DialogResult]::OK) {
-        return @{ Email = $txtEmailB.Text.Trim(); OU = $txtOU.Text.Trim() }
+        return @{ Email = $txtEmailB.Text.Trim(); OU = $cboOU.SelectedItem }
     }
     return $null
 }
@@ -506,6 +519,89 @@ DIRECTION SERVICES NUMERIQUES<br/>
 "@
 }
 
+function Get-CorpsMessageHTML_DejaInit_Preview {
+    param($objet, $nom, $prenom, $dateInit, $cheminHeader, $cheminSignature)
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; margin: 0; padding: 0; background: #1E1E1E;
+        scrollbar-base-color: #1E1E1E; scrollbar-face-color: #555; scrollbar-track-color: #252526;
+        scrollbar-arrow-color: #808080; scrollbar-highlight-color: #555; scrollbar-shadow-color: #1E1E1E;
+        scrollbar-3dlight-color: #252526; scrollbar-darkshadow-color: #1E1E1E; }
+    .sujet-preview { background: #2D2D30; border-left: 3px solid #F39C12; color: #F39C12; font-size: 15px;
+        font-weight: bold; padding: 10px 15px; margin: 12px 12px 0 12px; }
+    hr.sujet { border: 0; border-top: 1px solid #3E3E42; margin: 0 12px; }
+    .email-body { background: #fff; padding: 20px; margin: 0 12px 12px 12px; }
+    .email-body h2 { color: #253A5E; margin-top: 0; }
+    .email-body p { margin: 8px 0; color: #333; }
+    .email-body a { color: #0066cc; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class='sujet-preview'>$objet</div>
+<hr class='sujet'/>
+<div class='email-body'>
+<table style='width:100%'><tr>
+<td style='width:140px; vertical-align:top;'><img src='file:///$cheminHeader' style='width:130px;'/></td>
+<td style='vertical-align:top; padding-left:25px;'>
+<h2>Mouvement d'un Agent SNCF</h2>
+<p>Bonjour,</p>
+<p>Vous avez été identifié comme déclarant du mouvement de <b>$prenom $nom</b> nouveau collaborateur dans l'entreprise.</p>
+<p>Après vérification, un mot de passe est déjà présent sur le compte depuis le <b>$dateInit</b>, nous n'allons donc pas initialiser celui-ci.</p>
+<p>Si nécessaire, <b>$prenom $nom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
+<p>Merci de votre compréhension.</p>
+<div style='margin-top:20px; font-size:13px;'>
+Cordialement,<br/>
+<b>Votre Assistance Bureautique</b><br/>
+SNCF - Solutions<br/>
+DIRECTION SERVICES NUMERIQUES<br/>
+<img src='file:///$cheminSignature' style='width:330px; margin-top:12px;'/>
+</div>
+</td></tr></table>
+</div>
+</body>
+</html>
+"@
+}
+
+function Get-CorpsMessageHTML_DejaInit_Final {
+    param($nom, $prenom, $dateInit, $cheminHeader, $cheminSignature)
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 14px; margin: 20px; }
+    h2 { color: #253A5E; margin-top:0; }
+    p { margin: 8px 0; }
+    a { color: #0066cc; text-decoration: underline; }
+</style>
+</head>
+<body>
+<table style='width:100%'><tr>
+<td style='width:140px; vertical-align:top;'><img src='file:///$cheminHeader' style='width:130px;'/></td>
+<td style='vertical-align:top; padding-left:25px;'>
+<h2>Mouvement d'un Agent SNCF</h2>
+<p>Bonjour,</p>
+<p>Vous avez été identifié comme déclarant du mouvement de <b>$prenom $nom</b> nouveau collaborateur dans l'entreprise.</p>
+<p>Après vérification, un mot de passe est déjà présent sur le compte depuis le <b>$dateInit</b>, nous n'allons donc pas initialiser celui-ci.</p>
+<p>Si nécessaire, <b>$prenom $nom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
+<p>Merci de votre compréhension.</p>
+<div style='margin-top:20px; font-size:13px;'>
+Cordialement,<br/>
+<b>Votre Assistance Bureautique</b><br/>
+SNCF - Solutions<br/>
+DIRECTION SERVICES NUMERIQUES<br/>
+<img src='file:///$cheminSignature' style='width:330px; margin-top:12px;'/>
+</div>
+</td></tr></table>
+</body>
+</html>
+"@
+}
+
 # --- Interface principale (thème sombre LixiSpace) ---
 $form = New-Object Windows.Forms.Form
 $form.Text = "Arrivée Collaborateur"
@@ -557,7 +653,7 @@ $form.Controls.Add($lblSubTitle)
 # --- Panneau formulaire (fond secondaire) ---
 $panelForm = New-Object Windows.Forms.Panel
 $panelForm.Location = New-Object Drawing.Point(20, 75)
-$panelForm.Size = New-Object Drawing.Size(1045, 110)
+$panelForm.Size = New-Object Drawing.Size(1045, 145)
 $panelForm.BackColor = $cBgSecondary
 $panelForm.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($panelForm)
@@ -630,7 +726,52 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
     $lblStatusImg.Text = "Vérifier les images !"; $lblStatusImg.ForeColor = $cDanger
 }
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNom,$txtNom,$lblPrenom,$txtPrenom,$picHeader,$picSignature,$lblStatusImg))
+# Ligne 3 : Checkbox mot de passe déjà initialisé + DateTimePicker
+$chkMdpDejaInit = New-Object Windows.Forms.CheckBox
+$chkMdpDejaInit.Text = "Mot de passe déjà initialisé"
+$chkMdpDejaInit.Location = New-Object Drawing.Point($col1Lbl, 95)
+$chkMdpDejaInit.AutoSize = $true
+$chkMdpDejaInit.ForeColor = $cTextSecondary
+$chkMdpDejaInit.Font = [Drawing.Font]::new("Segoe UI", 9)
+$chkMdpDejaInit.FlatStyle = 'Flat'
+
+$lblDateInit = New-Object Windows.Forms.Label
+$lblDateInit.Text = "Date d'initialisation :"
+$lblDateInit.AutoSize = $true
+$lblDateInit.Location = New-Object Drawing.Point($col2Lbl, 98)
+$lblDateInit.ForeColor = $cTextSecondary
+$lblDateInit.Visible = $false
+
+$dtpDateInit = New-Object Windows.Forms.DateTimePicker
+$dtpDateInit.Location = New-Object Drawing.Point($col2In, 95)
+$dtpDateInit.Width = $inW
+$dtpDateInit.Format = 'Custom'
+$dtpDateInit.CustomFormat = 'dd/MM/yyyy'
+$dtpDateInit.Font = [Drawing.Font]::new("Segoe UI", 10)
+$dtpDateInit.Visible = $false
+
+$chkMdpDejaInit.Add_CheckedChanged({
+    $checked = $chkMdpDejaInit.Checked
+    $lblDateInit.Visible = $checked
+    $dtpDateInit.Visible = $checked
+    if ($checked) {
+        $btnGenPwd.Enabled = $false
+        $btnGenPwd.BackColor = $cBorder
+        $txtPwd.Text = ""
+        $txtPwd.BackColor = [Drawing.Color]::FromArgb(50, 50, 50)
+        $btnGenMsg.Enabled = $true
+    } else {
+        $btnGenPwd.Enabled = $true
+        $btnGenPwd.BackColor = $cAccentViolet
+        $txtPwd.BackColor = $cSurface
+        $btnGenMsg.Enabled = ($txtPwd.Text -ne "")
+    }
+    Update-Preview
+})
+
+$dtpDateInit.Add_ValueChanged({ Update-Preview })
+
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNom,$txtNom,$lblPrenom,$txtPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -659,7 +800,7 @@ Layout-FormPanel
 
 # --- Barre d'actions ---
 $panelActions = New-Object Windows.Forms.Panel
-$panelActions.Location = New-Object Drawing.Point(20, 195)
+$panelActions.Location = New-Object Drawing.Point(20, 230)
 $panelActions.Size = New-Object Drawing.Size(1045, 50)
 $panelActions.BackColor = $cBgSecondary
 $panelActions.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
@@ -715,8 +856,13 @@ $btnReset.Add_Click({
     $txtNom.Text = ""
     $txtPrenom.Text = ""
     $txtPwd.Text = ""
+    $chkMdpDejaInit.Checked = $false
+    $btnGenPwd.Enabled = $true
+    $btnGenPwd.BackColor = $cAccentViolet
+    $txtPwd.BackColor = $cSurface
     $global:CheminFichierTxt = $null
     $global:CheminZip = $null
+    $global:CopyDateInit = $null
     $global:CopyOU = "(à définir)"
     $global:CopyEmailBenef = "(à définir)"
     $rtbCopy.Text = Get-CopyBlockText
@@ -728,7 +874,7 @@ $panelActions.Controls.AddRange(@($btnGenPwd, $txtPwd, $btnGenMsg, $btnReset))
 
 # --- Panneau d'éléments à copier ---
 $panelCopy = New-Object Windows.Forms.Panel
-$panelCopy.Location = New-Object Drawing.Point(20, 255)
+$panelCopy.Location = New-Object Drawing.Point(20, 290)
 $panelCopy.Size = New-Object Drawing.Size(1045, 137)
 $panelCopy.BackColor = $cBgSecondary
 $panelCopy.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
@@ -745,9 +891,16 @@ $panelCopy.Controls.Add($lblCopyTitle)
 $global:CopyOU = "(à définir)"
 $global:CopyEmailBenef = "(à définir)"
 
+$global:CopyDateInit = $null
+
 function Get-CopyBlockText {
+    if ($global:CopyDateInit) {
+        $header = "***Vérifications Mon-AD : Mot de passe déjà initialisé le $($global:CopyDateInit)***"
+    } else {
+        $header = "***Mot de passe initialisé***"
+    }
     return @(
-        "***Mot de passe initialisé***",
+        $header,
         "Demande recevable",
         "Pas d'homonyme",
         "Pas de doublon de demande",
@@ -800,14 +953,14 @@ $panelCopy.Controls.AddRange(@($lblCopyTitle, $rtbCopy, $btnCopyAll))
 # --- Aperçu du sujet ---
 $lblSubjectLabel = New-Object Windows.Forms.Label
 $lblSubjectLabel.Text = "Objet :"
-$lblSubjectLabel.Location = New-Object Drawing.Point(20, 402)
+$lblSubjectLabel.Location = New-Object Drawing.Point(20, 437)
 $lblSubjectLabel.AutoSize = $true
 $lblSubjectLabel.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $lblSubjectLabel.ForeColor = $cTextSecondary
 $form.Controls.Add($lblSubjectLabel)
 
 $txtSubjectPreview = New-Object Windows.Forms.Label
-$txtSubjectPreview.Location = New-Object Drawing.Point(75, 398)
+$txtSubjectPreview.Location = New-Object Drawing.Point(75, 433)
 $txtSubjectPreview.Size = New-Object Drawing.Size(990, 28)
 $txtSubjectPreview.BackColor = $cSurface
 $txtSubjectPreview.ForeColor = $cAccentViolet
@@ -820,14 +973,14 @@ $form.Controls.Add($txtSubjectPreview)
 # --- Aperçu du message ---
 $lblPreviewLabel = New-Object Windows.Forms.Label
 $lblPreviewLabel.Text = "Aperçu du message"
-$lblPreviewLabel.Location = New-Object Drawing.Point(20, 439)
+$lblPreviewLabel.Location = New-Object Drawing.Point(20, 474)
 $lblPreviewLabel.AutoSize = $true
 $lblPreviewLabel.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $lblPreviewLabel.ForeColor = $cTextSecondary
 $form.Controls.Add($lblPreviewLabel)
 
 $panelPreview = New-Object Windows.Forms.Panel
-$panelPreview.Location = New-Object Drawing.Point(20, 462)
+$panelPreview.Location = New-Object Drawing.Point(20, 497)
 $panelPreview.Size = New-Object Drawing.Size(1045, 375)
 $panelPreview.BackColor = $cBgSecondary
 $panelPreview.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right -bor [Windows.Forms.AnchorStyles]::Bottom
@@ -843,9 +996,16 @@ function Update-Preview {
     $ritm = if($txtRITM.Text){$txtRITM.Text}else{"RITMXXXXX"}
     $nom = if($txtNom.Text){$txtNom.Text}else{"NOM"}
     $prenom = if($txtPrenom.Text){$txtPrenom.Text}else{"PRENOM"}
-    $objet = "$ritm - Notification mot de passe $nom $prenom"
-    $txtSubjectPreview.Text = $objet
-    $html = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
+    if ($chkMdpDejaInit.Checked) {
+        $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
+        $objet = "$ritm - Mot de passe déjà initialisé $nom $prenom"
+        $txtSubjectPreview.Text = $objet
+        $html = Get-CorpsMessageHTML_DejaInit_Preview $objet $nom $prenom $dateInit $cheminHeader $cheminSignature
+    } else {
+        $objet = "$ritm - Notification mot de passe $nom $prenom"
+        $txtSubjectPreview.Text = $objet
+        $html = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
+    }
     $webBrowser.DocumentText = $html
 }
 
@@ -863,46 +1023,74 @@ $btnGenPwd.Add_Click({
 })
 
 $btnGenMsg.Add_Click({
-    $actionsVerif = Show-AlertDialog -message "Avez-vous bien :`n- Modifié le mot de passe dans Mon-AD`n- Déplacé le compte dans la bonne OU`n`nSi ces actions n'ont pas été réalisées, cliquez sur NON." -title "VÉRIFICATION DES ACTIONS" -withCancel -buttonYesText "Oui, tout est fait" -buttonNoText "Non, abandonner"
-    if ($actionsVerif -eq [Windows.Forms.DialogResult]::No) {
-        Show-AlertDialog -message "Opération annulée. Veuillez réaliser les actions nécessaires avant de générer le message." -title "Opération annulée"
-        return
-    }
-    if (-not (Test-Path $global:CheminZip)) {
-        Show-AlertDialog -message "Générez le mot de passe d'abord." -title "Erreur"
-        return
-    }
     $ritm = $txtRITM.Text.Trim(); $nom = $txtNom.Text.Trim(); $prenom = $txtPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
     if ($ritm -eq "" -or $nom -eq "" -or $prenom -eq "" -or $dest -eq "") {
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
         return
     }
-    $objet = "$ritm - Notification mot de passe $nom $prenom"
-    $htmlFinal = Get-CorpsMessageHTML_Final $nom $prenom $cheminHeader $cheminSignature
-    $htmlPreview = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
-    $webBrowser.DocumentText = $htmlPreview
-    $cheminMsg = Join-Path $baseDir "$ritm`_notif.msg"
-    if (Creer-FichierMsg $objet $dest $htmlFinal $global:CheminZip $cheminMsg) {
-        $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
-        $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
-        if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
-            Invoke-Item $cheminMsg
-            Attendre-FermetureOutlookEtDeplacer $cheminMsg
+
+    if ($chkMdpDejaInit.Checked) {
+        # --- Mode : mot de passe déjà initialisé ---
+        $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
+        $objet = "$ritm - Mot de passe déjà initialisé $nom $prenom"
+        $htmlFinal = Get-CorpsMessageHTML_DejaInit_Final $nom $prenom $dateInit $cheminHeader $cheminSignature
+        $htmlPreview = Get-CorpsMessageHTML_DejaInit_Preview $objet $nom $prenom $dateInit $cheminHeader $cheminSignature
+        $webBrowser.DocumentText = $htmlPreview
+        $cheminMsg = Join-Path $baseDir "$ritm`_notif.msg"
+        if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
+            $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
+            $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
+            if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
+                Invoke-Item $cheminMsg
+                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+            }
         }
-        $cleanupMsg = "Voulez-vous supprimer les fichiers temporaires du dossier 'Mot de passe' ?`n`n- $($global:CheminFichierTxt)`n- $($global:CheminZip)"
-        $resultatCleanup = Show-AlertDialog -message $cleanupMsg -title "NETTOYAGE" -withCancel -buttonYesText "Oui, supprimer" -buttonNoText "Non, conserver"
-        if ($resultatCleanup -eq [Windows.Forms.DialogResult]::Yes) {
-            if (Test-Path $global:CheminFichierTxt) { Remove-Item $global:CheminFichierTxt -Force }
-            if (Test-Path $global:CheminZip) { Remove-Item $global:CheminZip -Force }
-            Show-AlertDialog -message "Fichiers temporaires supprimés avec succès." -title "Nettoyage terminé"
+        # Demander les informations du bénéficiaire
+        $global:CopyDateInit = $dateInit
+        $benef = Show-BeneficiaireDialog
+        if ($benef) {
+            if ($benef.Email) { $global:CopyEmailBenef = $benef.Email }
+            if ($benef.OU) { $global:CopyOU = ($benef.OU -replace '\s+', '/') -replace '/+', '/' }
         }
-    }
-    # Demander les informations du bénéficiaire (toujours, même si .msg en erreur)
-    $benef = Show-BeneficiaireDialog
-    if ($benef) {
-        if ($benef.Email) { $global:CopyEmailBenef = $benef.Email }
-        if ($benef.OU) { $global:CopyOU = ($benef.OU -replace '\s+', '/') -replace '/+', '/' }
         $rtbCopy.Text = Get-CopyBlockText
+    } else {
+        # --- Mode : nouveau mot de passe ---
+        $actionsVerif = Show-AlertDialog -message "Avez-vous bien :`n- Modifié le mot de passe dans Mon-AD`n- Déplacé le compte dans la bonne OU`n`nSi ces actions n'ont pas été réalisées, cliquez sur NON." -title "VÉRIFICATION DES ACTIONS" -withCancel -buttonYesText "Oui, tout est fait" -buttonNoText "Non, abandonner"
+        if ($actionsVerif -eq [Windows.Forms.DialogResult]::No) {
+            Show-AlertDialog -message "Opération annulée. Veuillez réaliser les actions nécessaires avant de générer le message." -title "Opération annulée"
+            return
+        }
+        if (-not (Test-Path $global:CheminZip)) {
+            Show-AlertDialog -message "Générez le mot de passe d'abord." -title "Erreur"
+            return
+        }
+        $objet = "$ritm - Notification mot de passe $nom $prenom"
+        $htmlFinal = Get-CorpsMessageHTML_Final $nom $prenom $cheminHeader $cheminSignature
+        $htmlPreview = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
+        $webBrowser.DocumentText = $htmlPreview
+        $cheminMsg = Join-Path $baseDir "$ritm`_notif.msg"
+        if (Creer-FichierMsg $objet $dest $htmlFinal $global:CheminZip $cheminMsg) {
+            $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
+            $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
+            if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
+                Invoke-Item $cheminMsg
+                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+            }
+            $cleanupMsg = "Voulez-vous supprimer les fichiers temporaires du dossier 'Mot de passe' ?`n`n- $($global:CheminFichierTxt)`n- $($global:CheminZip)"
+            $resultatCleanup = Show-AlertDialog -message $cleanupMsg -title "NETTOYAGE" -withCancel -buttonYesText "Oui, supprimer" -buttonNoText "Non, conserver"
+            if ($resultatCleanup -eq [Windows.Forms.DialogResult]::Yes) {
+                if (Test-Path $global:CheminFichierTxt) { Remove-Item $global:CheminFichierTxt -Force }
+                if (Test-Path $global:CheminZip) { Remove-Item $global:CheminZip -Force }
+                Show-AlertDialog -message "Fichiers temporaires supprimés avec succès." -title "Nettoyage terminé"
+            }
+        }
+        # Demander les informations du bénéficiaire
+        $benef = Show-BeneficiaireDialog
+        if ($benef) {
+            if ($benef.Email) { $global:CopyEmailBenef = $benef.Email }
+            if ($benef.OU) { $global:CopyOU = ($benef.OU -replace '\s+', '/') -replace '/+', '/' }
+            $rtbCopy.Text = Get-CopyBlockText
+        }
     }
 })
 
