@@ -17,6 +17,20 @@ public class DarkTitleBar {
     public static extern int SetWindowTheme(IntPtr hwnd, string subAppName, string subIdList);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SetCurrentProcessExplicitAppUserModelID(string AppID);
+    [DllImport("user32.dll")]
+    private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string windowName);
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(IntPtr hwnd, EnumChildProc callback, IntPtr lParam);
+    private delegate bool EnumChildProc(IntPtr hwnd, IntPtr lParam);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+    [DllImport("user32.dll")]
+    private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+    private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+    private static WinEventDelegate _hookDelegate;
+    private static IntPtr _hookHandle;
     public static void SetAppId(string appId) {
         SetCurrentProcessExplicitAppUserModelID(appId);
     }
@@ -31,10 +45,32 @@ public class DarkTitleBar {
     public static void ApplyDarkScrollbar(IntPtr handle) {
         SetWindowTheme(handle, "DarkMode_Explorer", null);
     }
+    private static void ApplyDarkToWindow(IntPtr hwnd) {
+        int val = 1;
+        DwmSetWindowAttribute(hwnd, 20, ref val, 4);
+        SetWindowTheme(hwnd, "DarkMode_Explorer", null);
+        EnumChildWindows(hwnd, (child, lp) => {
+            SetWindowTheme(child, "DarkMode_Explorer", null);
+            return true;
+        }, IntPtr.Zero);
+    }
+    public static void HookCalendarPopup() {
+        _hookDelegate = new WinEventDelegate((hook, evType, hwnd, idObj, idChild, thread, time) => {
+            var sb = new System.Text.StringBuilder(256);
+            GetClassName(hwnd, sb, 256);
+            string cls = sb.ToString();
+            if (cls == "SysMonthCal32" || cls == "DropDown") {
+                ApplyDarkToWindow(hwnd);
+            }
+        });
+        uint pid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+        _hookHandle = SetWinEventHook(0x0003, 0x0003, IntPtr.Zero, _hookDelegate, pid, 0, 0);
+    }
 }
 "@
 try { [DarkTitleBar]::EnableAppDarkMode() } catch {}
 try { [DarkTitleBar]::SetAppId("SNCF.ArriveeCollaborateur") } catch {}
+try { [DarkTitleBar]::HookCalendarPopup() } catch {}
 
 # --- Lanceur VBS portable sans élévation pour l'arrivée collab ---
 
@@ -299,18 +335,18 @@ function Show-BeneficiaireDialog {
     $cboOU.FlatStyle = 'Flat'
     $cboOU.Font = [Drawing.Font]::new("Segoe UI", 10)
     $cboOU.DropDownStyle = 'DropDownList'
-    $ouList = @(
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/GaresEtConnexions/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/HEXAFRET/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/OPTIMSERVICES/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SARESEAU/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SASNCF/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SAVOYAGEURS/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudAzur/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudMobilitesTechnologies/Utilisateurs",
-        "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/TECHNIS/Utilisateurs"
-    )
-    $cboOU.Items.AddRange($ouList)
+    $ouMap = [ordered]@{
+        "GaresEtConnexions"        = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/GaresEtConnexions/Utilisateurs"
+        "HEXAFRET"                 = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/HEXAFRET/Utilisateurs"
+        "OPTIMSERVICES"            = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/OPTIMSERVICES/Utilisateurs"
+        "SARESEAU"                 = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SARESEAU/Utilisateurs"
+        "SASNCF"                   = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SASNCF/Utilisateurs"
+        "SAVOYAGEURS"              = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SAVOYAGEURS/Utilisateurs"
+        "SudAzur"                  = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudAzur/Utilisateurs"
+        "SudMobilitesTechnologies" = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/SudMobilitesTechnologies/Utilisateurs"
+        "TECHNIS"                  = "COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/TECHNIS/Utilisateurs"
+    }
+    $cboOU.Items.AddRange(@($ouMap.Keys))
     $cboOU.SelectedIndex = 7
 
     $bp = New-Object Windows.Forms.Panel
@@ -345,7 +381,7 @@ function Show-BeneficiaireDialog {
     $dlg.Controls.AddRange(@($bar, $lblT, $lblEmailB, $txtEmailB, $lblOU, $cboOU, $bp))
     $result = $dlg.ShowDialog()
     if ($result -eq [Windows.Forms.DialogResult]::OK) {
-        return @{ Email = $txtEmailB.Text.Trim(); OU = $cboOU.SelectedItem }
+        return @{ Email = $txtEmailB.Text.Trim(); OU = $ouMap[$cboOU.SelectedItem] }
     }
     return $null
 }
@@ -379,7 +415,7 @@ function Creer-FichierMsg ($sujet, $dest, $htmlBody, $zipPath, $sortie) {
         $mail.Subject = $sujet
         $mail.To = $dest
         $mail.BodyFormat = 2
-        if (Test-Path $zipPath) { $mail.Attachments.Add($zipPath) }
+        if ($zipPath -and (Test-Path $zipPath)) { $mail.Attachments.Add($zipPath) }
         $mail.HTMLBody = $htmlBody
         $mail.SaveAs($sortie, 3)
         [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($mail)
@@ -625,6 +661,7 @@ $form.Add_Shown({
         [DarkTitleBar]::ApplyDarkScrollbar($panelForm.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($panelActions.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($rtbCopy.Handle)
+        [DarkTitleBar]::ApplyDarkScrollbar($dtpDateInit.Handle)
     } catch {}
 })
 
@@ -728,12 +765,20 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
 
 # Ligne 3 : Checkbox mot de passe déjà initialisé + DateTimePicker
 $chkMdpDejaInit = New-Object Windows.Forms.CheckBox
-$chkMdpDejaInit.Text = "Mot de passe déjà initialisé"
-$chkMdpDejaInit.Location = New-Object Drawing.Point($col1Lbl, 95)
-$chkMdpDejaInit.AutoSize = $true
-$chkMdpDejaInit.ForeColor = $cTextSecondary
-$chkMdpDejaInit.Font = [Drawing.Font]::new("Segoe UI", 9)
+$chkMdpDejaInit.Text = "  Mot de passe déjà initialisé"
+$chkMdpDejaInit.Appearance = 'Button'
+$chkMdpDejaInit.Location = New-Object Drawing.Point($col1Lbl, 90)
+$chkMdpDejaInit.Size = New-Object Drawing.Size(250, 32)
+$chkMdpDejaInit.ForeColor = $cWarning
+$chkMdpDejaInit.BackColor = $cSurface
+$chkMdpDejaInit.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $chkMdpDejaInit.FlatStyle = 'Flat'
+$chkMdpDejaInit.FlatAppearance.BorderColor = $cWarning
+$chkMdpDejaInit.FlatAppearance.BorderSize = 1
+$chkMdpDejaInit.FlatAppearance.CheckedBackColor = $cWarning
+$chkMdpDejaInit.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(60, 60, 64)
+$chkMdpDejaInit.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$chkMdpDejaInit.Cursor = [Windows.Forms.Cursors]::Hand
 
 $lblDateInit = New-Object Windows.Forms.Label
 $lblDateInit.Text = "Date d'initialisation :"
@@ -748,6 +793,13 @@ $dtpDateInit.Width = $inW
 $dtpDateInit.Format = 'Custom'
 $dtpDateInit.CustomFormat = 'dd/MM/yyyy'
 $dtpDateInit.Font = [Drawing.Font]::new("Segoe UI", 10)
+$dtpDateInit.BackColor = $cSurface
+$dtpDateInit.ForeColor = $cTextPrimary
+$dtpDateInit.CalendarMonthBackground = $cSurface
+$dtpDateInit.CalendarForeColor = $cTextPrimary
+$dtpDateInit.CalendarTitleBackColor = $cAccentViolet
+$dtpDateInit.CalendarTitleForeColor = $cWhite
+$dtpDateInit.CalendarTrailingForeColor = $cTextSecondary
 $dtpDateInit.Visible = $false
 
 $chkMdpDejaInit.Add_CheckedChanged({
@@ -755,12 +807,14 @@ $chkMdpDejaInit.Add_CheckedChanged({
     $lblDateInit.Visible = $checked
     $dtpDateInit.Visible = $checked
     if ($checked) {
+        $chkMdpDejaInit.ForeColor = $cWhite
         $btnGenPwd.Enabled = $false
         $btnGenPwd.BackColor = $cBorder
         $txtPwd.Text = ""
         $txtPwd.BackColor = [Drawing.Color]::FromArgb(50, 50, 50)
         $btnGenMsg.Enabled = $true
     } else {
+        $chkMdpDejaInit.ForeColor = $cWarning
         $btnGenPwd.Enabled = $true
         $btnGenPwd.BackColor = $cAccentViolet
         $txtPwd.BackColor = $cSurface
