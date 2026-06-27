@@ -91,6 +91,19 @@ try {
     if (Test-Path $tmpRoot) { Remove-Item $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+# --- Tutoriel : étapes + décision d'affichage ---
+. (Join-Path $lib 'Tutorial.ps1')
+$steps = @(Get-TutorialSteps @{ })
+Assert (@($steps).Count -eq 10) 'tuto : 10 etapes'
+Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
+Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
+Assert ($null -ne $steps[1].Target) 'tuto : etape 2 a une cible (scriptblock)'
+
+# Test-TutorialDue : pas vu -> du ; vu version courante -> pas du ; contenu plus recent -> du
+Assert (Test-TutorialDue @{ TutorialSeenVersion = 0 } 1) 'tuto : jamais vu -> affiche'
+Assert (-not (Test-TutorialDue @{ TutorialSeenVersion = 1 } 1)) 'tuto : deja vu version courante -> pas affiche'
+Assert (Test-TutorialDue @{ TutorialSeenVersion = 1 } 2) 'tuto : contenu plus recent -> reaffiche'
+
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TOUS LES TESTS PASSENT" -ForegroundColor Green }
 else { Write-Host "$($script:fail) ÉCHEC(S)" -ForegroundColor Red; exit 1 }
