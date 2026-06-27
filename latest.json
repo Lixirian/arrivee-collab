@@ -1,7 +1,8 @@
 ﻿{
-    "version":  "1.0.0",
-    "zip":  "Arrivee-Collab_version1.0.0.zip",
+    "version":  "1.1.0",
+    "zip":  "Arrivee-Collab_version1.1.0.zip",
     "notes":  [
-                  "Première version distribuée : versionning, mise à jour automatique depuis OneDrive et tutoriel interactif."
+                  "Mise à jour automatique : une pastille signale les nouvelles versions ; un clic présente les nouveautés puis installe la mise à jour et redémarre l\u0027application.",
+                  "Dialogue « Quoi de neuf » affiché après chaque mise à jour."
               ]
 }
