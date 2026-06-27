@@ -161,7 +161,7 @@ Adapté de SNOW à l'identique, avec les noms Arrivée Collab :
 - Lit `ArriveeCollab-PS\config.ps1` → `$Config.Version`.
 - Produit `Arrivee-Collab_version<X>.zip` (dossier racine interne = même nom), `latest.json`, archive les anciens zips → `Archives/`.
 - Assemble `dist-ready/` (lanceur `dist-launcher/*` + zip + latest.json), génère `Arrivee-Collab-dist-ready.zip` (kit complet) et `Arrivee-Collab-maj-<X>.zip` (minimal si le lanceur n'a pas changé, complet sinon — via `.dist-launcher-history.json`).
-- **Git** : commit local du build ; détecte l'absence de remote `origin` → pas de push (message « commit local seulement »).
+- **Git** : commit + **push automatique** vers `origin` (le dépôt privé `Lixirian/arrivee-collab` créé le 2026-06-27). Best-effort : un échec (hors ligne) n'échoue pas le build. `-NoGit` saute l'étape.
 
 ### 6.8 `dist-launcher/bootstrap.ps1`
 Adapté de SNOW : `dataDir = %LOCALAPPDATA%\Arrivee-Collab`, `appDir = ...\app`, sonde la présence de `...\app\Start-ArriveeCollab.vbs` pour décider de la première installation, mémorise `dist_path.txt`, nettoie les zips périmés (best-effort), lance l'app.
@@ -211,7 +211,7 @@ Un objet léger `$Ctx` (hashtable) porte `Config`, `State`, `AppRoot`, `DataDir`
 
 ## 10. Hors périmètre (YAGNI)
 
-- Pas de push GitHub (dépôt sans remote ; commit local suffit).
+- Pas de gestion d'historique distant complexe : le build pousse simplement `master` vers `origin` (best-effort).
 - Pas de notifications toast Windows.
 - Pas de cache WebView2 à purger (l'app n'en a pas).
 - Pas de canal de MAJ par API/HTTP : uniquement lecture de fichiers OneDrive.
