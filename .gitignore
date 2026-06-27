@@ -1,3 +1,9 @@
 Mot de passe/
 Archive message/
 .claude/
+
+# Artefacts de build (regeneres par build-zip.ps1)
+dist-ready/
+Arrivee-Collab-dist-ready.zip
+Arrivee-Collab-maj-*.zip
+Archives/
