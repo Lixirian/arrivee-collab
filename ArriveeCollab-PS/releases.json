@@ -1,4 +1,8 @@
 {
+    "1.1.0": [
+        "Mise à jour automatique : une pastille signale les nouvelles versions ; un clic présente les nouveautés puis installe la mise à jour et redémarre l'application.",
+        "Dialogue « Quoi de neuf » affiché après chaque mise à jour."
+    ],
     "1.0.0": [
         "Première version distribuée : versionning, mise à jour automatique depuis OneDrive et tutoriel interactif."
     ]

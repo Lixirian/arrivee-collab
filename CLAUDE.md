@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures seront gérées via une pastille in-app (Plan B, à venir).
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app vérifie périodiquement le dossier de distribution et propose d'installer la nouvelle version.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ docs/superpowers/          ← specs et plans de conception
 ### Modèle d'exécution
 
 L'app écrit toutes ses sorties sous `%LOCALAPPDATA%\Arrivee-Collab\` :
-- `app\` — copie de `ArriveeCollab-PS/` (sera écrasée lors des mises à jour futures — Plan B)
+- `app\` — copie de `ArriveeCollab-PS/` (écrasée lors des mises à jour par `lib/Update.ps1`)
 - `data\Mot de passe\` — .txt et .zip temporaires du mot de passe
 - `data\Archive message\` — .msg archivés après envoi
 - `state.json` — état persistant (version installée…)
@@ -124,6 +124,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 - **`build-zip.ps1`** — Packaging : crée un zip versionné (`Arrivee-Collab_version<X>.zip`), génère `latest.json`, peuple `dist-ready/` avec les bundles complets, et tente un commit/push vers `origin`
 - **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`
 - **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`
+- **`lib/Update.ps1`** — détection MAJ, pastille, dialogues, self-update, Quoi de neuf
 
 ### Dossiers
 
@@ -170,4 +171,4 @@ Boutons : `FlatStyle = 'Flat'`, `BorderSize = 0`, police Segoe UI SemiBold. Barr
 - Les liens dans le template HTML pointent vers le SharePoint interne SNCF
 - Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`, `$global:CopyDateInit`)
 - Le fichier .msg est nommé `{RITM}_notif.msg` dans `%LOCALAPPDATA%\Arrivee-Collab\` avant archivage
-- **Plan B (à venir)** : `lib/Update.ps1` (pastille MAJ, self-update, « Quoi de neuf »), `lib/Tutorial.ps1` (tutoriel interactif data-driven) — voir `docs/superpowers/specs/2026-06-27-versionning-maj-tutoriel-design.md`
+- **Plan C (à venir)** : `lib/Tutorial.ps1` (tutoriel interactif data-driven) — voir `docs/superpowers/specs/2026-06-27-versionning-maj-tutoriel-design.md`
