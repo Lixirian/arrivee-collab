@@ -1,8 +1,8 @@
 ﻿{
-    "version":  "1.1.0",
-    "zip":  "Arrivee-Collab_version1.1.0.zip",
+    "version":  "1.2.0",
+    "zip":  "Arrivee-Collab_version1.2.0.zip",
     "notes":  [
-                  "Mise à jour automatique : une pastille signale les nouvelles versions ; un clic présente les nouveautés puis installe la mise à jour et redémarre l\u0027application.",
-                  "Dialogue « Quoi de neuf » affiché après chaque mise à jour."
+                  "Tutoriel interactif : au premier lancement, un guide en 10 étapes présente l\u0027outil ; chaque étape met en évidence la zone concernée.",
+                  "Bouton « ? » en haut à droite pour rejouer le tutoriel à tout moment."
               ]
 }
