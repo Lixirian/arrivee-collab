@@ -23,7 +23,7 @@ Pas de build, pas de tests, pas de linting — c'est un utilitaire autonome.
 
 ## Architecture
 
-**Tout le code applicatif est dans `arrivee collab.ps1`** (~886 lignes). Il n'y a pas de modules externes.
+**Tout le code applicatif est dans `arrivee collab.ps1`** (~1156 lignes). Il n'y a pas de modules externes.
 
 Le script suit une structure linéaire :
 1. Chargement assemblies .NET + déclaration de la classe C# inline `DarkTitleBar` (`Add-Type`)
@@ -37,14 +37,19 @@ Le script suit une structure linéaire :
 
 ### Flux de travail utilisateur
 
+L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux modes** selon la case à cocher `chkMdpDejaInit` :
+
+**Mode standard (nouveau mot de passe)** :
 1. Saisie des informations (RITM, email du demandeur, nom, prénom)
 2. Génération d'un mot de passe aléatoire 12 caractères → copié dans le presse-papiers
 3. Création d'un fichier texte + ZIP dans `Mot de passe/`
 4. Dialogue de vérification des actions pré-requises (Mon-AD, OU)
-5. Création d'un fichier `.msg` Outlook avec le ZIP en PJ et un corps HTML formaté SNCF
+5. Création d'un fichier `.msg` Outlook avec le ZIP en PJ et un corps HTML formaté SNCF (`Get-CorpsMessageHTML_Final`)
 6. Ouverture optionnelle du .msg + archivage automatique dans `Archive message/` (via script PowerShell en arrière-plan qui poll le fichier jusqu'à sa libération)
 7. Nettoyage optionnel des fichiers temporaires
 8. Saisie des informations bénéficiaire (email, OU) → mise à jour de la note ServiceNow copiable
+
+**Mode « Mot de passe déjà initialisé »** (case `chkMdpDejaInit` cochée) : affiche un `DateTimePicker` (date d'initialisation), désactive la génération de mot de passe, et envoie un mail différent (`Get-CorpsMessageHTML_DejaInit_Final`) **sans PJ ZIP** indiquant que le compte possède déjà un mot de passe. Pas d'étape de vérification Mon-AD ni de nettoyage. La date est reportée dans l'en-tête de la note ServiceNow via `$global:CopyDateInit`.
 
 ### Fonctions clés
 
@@ -56,10 +61,11 @@ Le script suit une structure linéaire :
 | `Creer-Zip` | Compresse le .txt dans un ZIP (via dossier temp `$env:TEMP\tempZipSNCF`) |
 | `Creer-FichierMsg` | Crée un .msg via COM Outlook |
 | `Attendre-FermetureOutlookEtDeplacer` | Lance un script PS en arrière-plan (max 30 tentatives, 2s d'intervalle) qui attend la libération du fichier .msg puis le déplace dans Archive |
-| `Get-CorpsMessageHTML_Preview` / `_Final` | Génère le HTML du mail (Preview inclut l'objet + cadre sombre, Final = mail brut envoyé) |
+| `Get-CorpsMessageHTML_Preview` / `_Final` | Génère le HTML du mail standard (Preview inclut l'objet + cadre sombre, Final = mail brut envoyé) |
+| `Get-CorpsMessageHTML_DejaInit_Preview` / `_Final` | Variantes pour le mode « mot de passe déjà initialisé » (mail « Mouvement d'un Agent SNCF », mentionne la date d'init, pas de PJ) |
 | `Show-AlertDialog` | Boîte de dialogue dark theme (simple OK ou Oui/Non avec textes personnalisables) |
-| `Show-BeneficiaireDialog` | Dialogue pour saisir l'email et l'OU du bénéficiaire (OU par défaut : `COMMUN.AD.SNCF.FR/.../Utilisateurs`) |
-| `Get-CopyBlockText` | Génère le texte de la note ServiceNow (affiché dans le panneau copiable) |
+| `Show-BeneficiaireDialog` | Dialogue pour saisir l'email et l'OU du bénéficiaire. L'OU est une **liste déroulante** (`DropDownList`) figée de 9 entités SudEst (`$ouMap` : GaresEtConnexions, HEXAFRET, OPTIMSERVICES, SARESEAU, SASNCF, SAVOYAGEURS, SudAzur, SudMobilitesTechnologies, TECHNIS), chacune mappée vers un chemin `COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/.../Utilisateurs`. Sélection par défaut : `SudMobilitesTechnologies` (index 7) |
+| `Get-CopyBlockText` | Génère le texte de la note ServiceNow (affiché dans le panneau copiable). L'en-tête change selon `$global:CopyDateInit` |
 | `Update-Preview` | Met à jour l'aperçu HTML et l'objet en temps réel à chaque modification des champs |
 | `Layout-FormPanel` | Recalcule le layout responsive du formulaire à chaque redimensionnement |
 
@@ -67,12 +73,12 @@ Le script suit une structure linéaire :
 
 | Classe | Rôle |
 |---|---|
-| `DarkTitleBar` | Active la barre de titre sombre Windows 10/11 via `DwmSetWindowAttribute` (dwmapi.dll), active le mode sombre système via `uxtheme.dll`, applique les scrollbars sombres, et définit l'AppUserModelID (`SNCF.ArriveeCollaborateur`) |
+| `DarkTitleBar` | Active la barre de titre sombre Windows 10/11 via `DwmSetWindowAttribute` (dwmapi.dll), active le mode sombre système via `uxtheme.dll`, applique les scrollbars sombres, définit l'AppUserModelID (`SNCF.ArriveeCollaborateur`), et installe un `SetWinEventHook` (`HookCalendarPopup`) qui force le thème sombre sur les popups de calendrier (`SysMonthCal32` / `DropDown`) du `DateTimePicker` dès leur ouverture |
 
 ### Scripts secondaires
 
 - **`arrivée de collab.vbs`** — Lanceur VBScript qui exécute le PS1 en mode fenêtre masquée sans élévation
-- **`CreerRaccourci.ps1`** — Génère (ou régénère) le fichier VBS lanceur. Note : ce code est aussi dupliqué inline dans le PS1 principal (lignes ~169-228)
+- **`CreerRaccourci.ps1`** — Génère (ou régénère) le fichier VBS lanceur. Note : ce code est aussi dupliqué inline dans le PS1 principal (lignes ~75-134)
 
 ### Dossiers
 
@@ -116,5 +122,5 @@ Boutons : `FlatStyle = 'Flat'`, `BorderSize = 0`, police Segoe UI SemiBold. Barr
 - Les noms de fonctions utilisent la convention `Verbe-Nom` PowerShell mais avec des verbes français (`Creer-`, `Attendre-`)
 - L'adresse expéditeur configurée est `noreply.dsnu.asut.asuidf@sncf.fr`
 - Les liens dans le template HTML pointent vers le SharePoint interne SNCF
-- Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`)
+- Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`, `$global:CopyDateInit`)
 - Le fichier .msg est nommé `{RITM}_notif.msg` à la racine du projet avant archivage
