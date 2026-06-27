@@ -147,3 +147,189 @@ function Invoke-UpdateCheck {
     } catch { Write-AppLog "[MAJ] Vérification KO : $($_.Exception.Message)" }
     try { Update-UpdateBadge $Ctx } catch { }
 }
+
+# ============================================================================
+#  DIALOGUES (WinForms, thème sombre — même style que Show-AlertDialog) + SELF-UPDATE.
+# ============================================================================
+
+# Dialogue générique listant des notes groupées par version. $Groups = @(@{Version;Notes}).
+# Renvoie $true si le bouton primaire (violet) est cliqué, sinon $false.
+function Show-NotesDialog {
+    param([string]$Title, [string]$Headline, [string]$Sub, $Groups, [string]$PrimaryText, [bool]$ShowSecondary)
+    $dlg = New-Object Windows.Forms.Form
+    $dlg.Text = $Title
+    $dlg.Size = New-Object Drawing.Size(520, 460)
+    $dlg.StartPosition = "CenterScreen"
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false; $dlg.MinimizeBox = $false
+    $dlg.BackColor = $cBgMain; $dlg.ForeColor = $cTextPrimary
+    $dlg.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $dlgIconPath = Join-Path $baseDir "image-arrivee-collab.ico"
+    if (Test-Path $dlgIconPath) { try { $dlg.Icon = New-Object Drawing.Icon($dlgIconPath) } catch {} }
+    $dlg.Add_Shown({ try { [DarkTitleBar]::Enable($this.Handle); [DarkTitleBar]::ApplyDarkScrollbar($rtbNotes.Handle) } catch {} })
+
+    $bar = New-Object Windows.Forms.Panel
+    $bar.Dock = "Top"; $bar.Height = 3; $bar.BackColor = $cAccentViolet
+
+    $lblH = New-Object Windows.Forms.Label
+    $lblH.Text = $Headline
+    $lblH.Font = [Drawing.Font]::new("Segoe UI", 15, [Drawing.FontStyle]::Bold)
+    $lblH.ForeColor = $cWhite
+    $lblH.Location = New-Object Drawing.Point(22, 14); $lblH.AutoSize = $true
+
+    $lblS = New-Object Windows.Forms.Label
+    $lblS.Text = $Sub
+    $lblS.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+    $lblS.ForeColor = $cAccentViolet
+    $lblS.Location = New-Object Drawing.Point(24, 48); $lblS.AutoSize = $true
+
+    # Notes : RichTextBox en lecture seule, une section "vX" + puces par groupe.
+    $rtbNotes = New-Object Windows.Forms.RichTextBox
+    $rtbNotes.Location = New-Object Drawing.Point(22, 80)
+    $rtbNotes.Size = New-Object Drawing.Size(468, 290)
+    $rtbNotes.BackColor = $cSurface; $rtbNotes.ForeColor = $cTextPrimary
+    $rtbNotes.BorderStyle = 'None'; $rtbNotes.ReadOnly = $true
+    $rtbNotes.Font = [Drawing.Font]::new("Segoe UI", 9)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($g in @($Groups)) {
+        $gnotes = @($g.Notes)
+        if ($gnotes.Count -eq 0) { continue }
+        [void]$sb.AppendLine("v$($g.Version)")
+        foreach ($n in $gnotes) { [void]$sb.AppendLine("  • $n") }
+        [void]$sb.AppendLine("")
+    }
+    if ($sb.Length -eq 0) { [void]$sb.AppendLine("Améliorations et corrections diverses.") }
+    $rtbNotes.Text = $sb.ToString().TrimEnd()
+
+    $bp = New-Object Windows.Forms.Panel
+    $bp.Dock = "Bottom"; $bp.Height = 55; $bp.BackColor = $cBgSecondary
+    $result = @{ Ok = $false }
+
+    $btnP = New-Object Windows.Forms.Button
+    $btnP.Text = $PrimaryText
+    $btnP.Size = New-Object Drawing.Size(230, 35)
+    $btnP.Location = New-Object Drawing.Point(260, 10)
+    $btnP.FlatStyle = 'Flat'; $btnP.FlatAppearance.BorderSize = 0
+    $btnP.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
+    $btnP.BackColor = $cAccentViolet; $btnP.ForeColor = $cWhite
+    $btnP.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+    $btnP.Cursor = [Windows.Forms.Cursors]::Hand
+    $btnP.Add_Click({ $result.Ok = $true; $dlg.Close() }.GetNewClosure())
+    $bp.Controls.Add($btnP); $dlg.AcceptButton = $btnP
+
+    if ($ShowSecondary) {
+        $btnL = New-Object Windows.Forms.Button
+        $btnL.Text = "Plus tard"
+        $btnL.Size = New-Object Drawing.Size(110, 35)
+        $btnL.Location = New-Object Drawing.Point(140, 10)
+        $btnL.FlatStyle = 'Flat'; $btnL.FlatAppearance.BorderSize = 0
+        $btnL.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(78, 78, 82)
+        $btnL.BackColor = $cBorder; $btnL.ForeColor = $cTextPrimary
+        $btnL.Font = [Drawing.Font]::new("Segoe UI", 10)
+        $btnL.Cursor = [Windows.Forms.Cursors]::Hand
+        $btnL.Add_Click({ $dlg.Close() }.GetNewClosure())
+        $bp.Controls.Add($btnL); $dlg.CancelButton = $btnL
+    }
+
+    $dlg.Controls.AddRange(@($rtbNotes, $lblS, $lblH, $bar, $bp))
+    [void]$dlg.ShowDialog()
+    return $result.Ok
+}
+
+# Dialogue de proposition de mise à jour : notes des 3 dernières versions + bouton confirmer.
+function Show-UpdateDialog {
+    param($Ctx)
+    $m = $Ctx.UpdateAvailable
+    if (-not $m) { return $false }
+    $groups = @(@{ Version = $m.Version; Notes = @($m.Notes) })
+    foreach ($g in @(Get-RecentReleaseNotes $Ctx 3)) {
+        if ([string]$g.Version -ne [string]$m.Version) { $groups += $g }
+    }
+    $groups = @($groups | Select-Object -First 3)
+    $sub = "Version $($Ctx.Config.Version)  →  $($m.Version)"
+    return (Show-NotesDialog "Mise à jour Arrivée Collab" "⬆ Mise à jour disponible" $sub $groups "⬆ Mettre à jour et redémarrer" $true)
+}
+
+# À APPELER AU LANCEMENT (avec la version PRÉCÉDENTE capturée AVANT migration). Si l'app
+# a fait une vraie montée, affiche les notes de toutes les versions franchies. Anti-doublon.
+function Show-WhatsNewIfUpgraded {
+    param($Ctx, [string]$PreviousVersion)
+    try {
+        $cur = [string]$Ctx.Config.Version
+        if (-not $PreviousVersion) { return }
+        if ((Compare-AppVersion $cur $PreviousVersion) -le 0) { return }
+        if ([string]$Ctx.State.NotesShownVersion -eq $cur) {
+            Write-AppLog ("[VERSION] Notes {0} déjà vues : pas de ré-affichage." -f $cur); return
+        }
+        Write-AppLog ("[VERSION] Montée {0} -> {1} : affichage des notes franchies." -f $PreviousVersion, $cur)
+        $groups = @(Get-ReleaseNotesBetween $Ctx $PreviousVersion $cur)
+        if (@($groups).Count -eq 0) { $groups = @(@{ Version = $cur; Notes = (Get-LocalReleaseNotes $Ctx $cur) }) }
+        $sub = "Version $PreviousVersion  →  $cur"
+        [void](Show-NotesDialog "Nouveautés Arrivée Collab" "✨ Mise à jour installée" $sub $groups "OK" $false)
+        $Ctx.State.NotesShownVersion = $cur
+        try { Save-AppState $Ctx.State } catch { }
+    } catch { Write-AppLog "[VERSION] Affichage des notes au lancement KO : $($_.Exception.Message)" }
+}
+
+# Lance la mise à jour : copie le zip en local, écrit un updater DÉTACHÉ (attend la
+# fermeture de l'app, remplace AppRoot, relance via Start-ArriveeCollab.vbs), puis ferme.
+function Invoke-SelfUpdate {
+    param($Ctx)
+    try {
+        $m = $Ctx.UpdateAvailable
+        if (-not $m) { return }
+        $dir = Get-UpdateDir $Ctx
+        if (-not $dir) { Write-AppLog "[MAJ] Dossier de distribution indisponible."; return }
+        $srcZip = Join-Path $dir $m.Zip
+        if (-not (Test-Path -LiteralPath $srcZip)) { Write-AppLog "[MAJ] Zip source introuvable : $srcZip"; return }
+
+        $upDir = Join-Path $Ctx.DataDir 'update'
+        if (-not (Test-Path -LiteralPath $upDir)) { New-Item -ItemType Directory -Path $upDir -Force | Out-Null }
+        $localZip = Join-Path $upDir ("new_$($m.Version).zip")
+        Copy-Item -LiteralPath $srcZip -Destination $localZip -Force
+
+        $appRoot   = $Ctx.AppRoot
+        $launcher  = Join-Path $appRoot 'Start-ArriveeCollab.vbs'
+        $updaterPs = Join-Path $upDir 'updater.ps1'
+        $logPath   = Join-Path $Ctx.DataDir 'app_debug.log'
+
+        $updaterBody = @'
+param([int]$AppPid, [string]$Zip, [string]$AppRoot, [string]$Launcher, [string]$LogPath)
+function L($m) { try { Add-Content -LiteralPath $LogPath -Value ("{0} [MAJ] {1}" -f (Get-Date -Format 'HH:mm:ss'), $m) -Encoding UTF8 } catch {} }
+try {
+    try { Wait-Process -Id $AppPid -Timeout 90 -ErrorAction SilentlyContinue } catch {}
+    Start-Sleep -Milliseconds 800
+    $tmp = Join-Path $env:TEMP ('acupd_' + [guid]::NewGuid().ToString('N'))
+    try {
+        Expand-Archive -LiteralPath $Zip -DestinationPath $tmp -Force
+        $inner = Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1
+        $srcContent = if ($inner) { $inner.FullName } else { $tmp }
+        Copy-Item -Path (Join-Path $srcContent '*') -Destination $AppRoot -Recurse -Force
+        L ("Fichiers remplaces dans " + $AppRoot)
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
+    }
+    Start-Process -FilePath 'wscript.exe' -ArgumentList ('"' + $Launcher + '"') -WorkingDirectory $AppRoot
+    L "Application relancee apres mise a jour."
+} catch { L ("ECHEC updater : " + $_.Exception.Message) }
+'@
+        [System.IO.File]::WriteAllText($updaterPs, $updaterBody, (New-Object System.Text.UTF8Encoding $false))
+
+        $argLine = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -AppPid {1} -Zip "{2}" -AppRoot "{3}" -Launcher "{4}" -LogPath "{5}"' -f `
+            $updaterPs, $PID, $localZip, $appRoot, $launcher, $logPath
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine -WindowStyle Hidden | Out-Null
+        Write-AppLog ("[MAJ] Updater lancé (vers {0}). Fermeture de l'application." -f $m.Version)
+        try { $form.Close() } catch { }
+        [System.Windows.Forms.Application]::Exit()
+    } catch { Write-AppLog "[MAJ] Lancement de la mise à jour KO : $($_.Exception.Message)" }
+}
+
+# Re-lit latest.json à l'instant du clic (saute à la toute dernière version), affiche le
+# dialogue, et lance le self-update si confirmé.
+function Invoke-PromptAndUpdate {
+    param($Ctx)
+    try { Invoke-UpdateCheck $Ctx } catch { }
+    if (-not $Ctx.UpdateAvailable) { return }
+    if (Show-UpdateDialog $Ctx) { Invoke-SelfUpdate $Ctx }
+}
