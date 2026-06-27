@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  Lanceur "toujours la dernière version" de l'outil Arrivee Collaborateur.
 #  A PLACER DANS LE DOSSIER DE DISTRIBUTION (OneDrive), a cote de latest.json et
 #  des zips. A chaque lancement :
