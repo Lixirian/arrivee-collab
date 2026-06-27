@@ -676,7 +676,7 @@ $global:Ctx.UpdateBadge = $lblUpdateBadge
 $btnHelp = New-Object Windows.Forms.Button
 $btnHelp.Text = "?"
 $btnHelp.Size = New-Object Drawing.Size(34, 34)
-$btnHelp.Location = New-Object Drawing.Point(1055, 18)
+$btnHelp.Location = New-Object Drawing.Point(1042, 18)
 $btnHelp.FlatStyle = 'Flat'; $btnHelp.FlatAppearance.BorderSize = 0
 $btnHelp.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
 $btnHelp.BackColor = $cBorder; $btnHelp.ForeColor = $cWhite
@@ -695,7 +695,7 @@ function Update-UpdateBadge {
     $action = {
         if ($Ctx.UpdateAvailable) {
             $b.Text = "  ⬆ Mise à jour $($Ctx.UpdateAvailable.Version)  "
-            $b.Left = $form.ClientSize.Width - $b.Width - 25
+            $b.Left = $btnHelp.Left - $b.Width - 10
             $b.Visible = $true; $b.BringToFront()
         } else { $b.Visible = $false }
     }

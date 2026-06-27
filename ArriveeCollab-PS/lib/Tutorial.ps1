@@ -91,6 +91,9 @@ function Show-Tutorial {
     $steps = @(Get-TutorialSteps $Ctx)
     $n = $steps.Count
     if ($n -eq 0) { return }
+    # Capture LOCALE : dans une closure (.GetNewClosure), `$script:` désignerait le
+    # module de la closure (où $TutorialVersion est absent = $null) et non ce script.
+    $ver = $script:TutorialVersion
 
     # --- Cadre de surbrillance : Form anneau violet, repositionné par étape ---
     $frame = New-Object Windows.Forms.Form
@@ -98,6 +101,7 @@ function Show-Tutorial {
     $frame.StartPosition = 'Manual'; $frame.TopMost = $true
     $frame.BackColor = $cAccentViolet
     $frame.Enabled = $false   # purement décoratif (pas d'interaction)
+    $frame.Add_FormClosed({ try { if ($this.Region) { $this.Region.Dispose() } } catch { } })
 
     # --- Carte d'explication : Form dark avec liseré violet ---
     $card = New-Object Windows.Forms.Form
@@ -195,7 +199,7 @@ function Show-Tutorial {
     }.GetNewClosure()
 
     $finish = {
-        try { $Ctx.State.TutorialSeen = $true; $Ctx.State.TutorialSeenVersion = $script:TutorialVersion; Save-AppState $Ctx.State } catch { }
+        try { $Ctx.State.TutorialSeen = $true; $Ctx.State.TutorialSeenVersion = $ver; Save-AppState $Ctx.State } catch { }
         try { $form.Enabled = $true } catch { }
         try { $frame.Close() } catch { }
         try { $card.Close() } catch { }
