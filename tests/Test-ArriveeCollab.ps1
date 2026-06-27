@@ -30,6 +30,7 @@ try {
     Assert ($s2.Version -eq '1.0.0')        'state : Version relue'
     Assert ($s2.TutorialSeen -eq $true)     'state : TutorialSeen relu'
     Assert ($s2.TutorialSeenVersion -eq 2)  'state : TutorialSeenVersion relu'
+    Assert ($s2.NotesShownVersion -eq '1.0.0') 'state : NotesShownVersion relue'
 
     $migrated = Invoke-AppVersionMigration $s2 '1.1.0'
     Assert ($migrated -eq $true)            'migration : montée détectée'
