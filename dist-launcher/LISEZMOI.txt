@@ -1,0 +1,27 @@
+Arrivee Collaborateur - Dossier de distribution (OneDrive)
+==========================================================
+
+CONTENU A METTRE DANS CE DOSSIER (acces LECTURE SEULE pour l'equipe) :
+  - latest.json                      (genere par build-zip.ps1 : version + zip + notes)
+  - Arrivee-Collab_version<X>.zip     (le ou les zips versionnes)
+  - Arrivee Collab.cmd + Arrivee Collab.vbs + bootstrap.ps1   (le lanceur)
+
+UTILISATION (cote utilisateur)
+  Lancer "Arrivee Collab.cmd" (ou un raccourci vers lui). Le lanceur :
+    1. lit latest.json ;
+    2. si la copie locale (%LOCALAPPDATA%\Arrivee-Collab\app) n'existe pas,
+       installe la derniere version automatiquement ;
+    3. demarre l'application.
+  Une fois lancee, l'app surveille ce dossier : si une nouvelle version parait,
+  une pastille "MAJ" s'affiche ; au clic, les notes sont presentees et la mise a
+  jour se fait (fermeture + remplacement + redemarrage). [Plan B]
+
+PUBLIER UNE NOUVELLE VERSION (cote mainteneur)
+  1. Incrementer Config.Version dans ArriveeCollab-PS\config.ps1.
+  2. Ajouter les notes de la version dans releases.json.
+  3. Lancer build-zip.ps1  -> produit le zip + latest.json + dist-ready.
+  4. Copier le contenu de dist-ready\ (ou extraire Arrivee-Collab-dist-ready.zip)
+     dans CE dossier OneDrive.
+
+ACCES : LECTURE SEULE suffit pour l'equipe (l'app ne fait que LIRE ces fichiers).
+Seul le mainteneur a besoin de l'acces en ecriture pour publier.
