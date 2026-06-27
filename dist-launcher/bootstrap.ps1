@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 $dist    = $PSScriptRoot
 $dataDir = Join-Path $env:LOCALAPPDATA 'Arrivee-Collab'
 $appDir  = Join-Path $dataDir 'app'
-$log     = Join-Path $dataDir 'app_debug.log'
+$log     = Join-Path $dataDir 'bootstrap.log'
 function L($m) { try { if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force | Out-Null }; Add-Content -LiteralPath $log -Value ("{0} [LANCEUR] {1}" -f (Get-Date -Format 'HH:mm:ss'), $m) -Encoding UTF8 } catch {} }
 try {
     if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force | Out-Null }
@@ -26,7 +26,7 @@ try {
     # Version cible (latest.json).
     $targetVer = $null; $zipName = $null
     $mf = Join-Path $dist 'latest.json'
-    if (Test-Path $mf) {
+    if (Test-Path -LiteralPath $mf) {
         try { $j = (Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json); $targetVer = [string]$j.version; $zipName = [string]$j.zip } catch { L "latest.json illisible : $($_.Exception.Message)" }
     }
     if (-not $zipName -and $targetVer) { $zipName = "Arrivee-Collab_version$targetVer.zip" }
@@ -37,16 +37,19 @@ try {
     if (-not $localExists) {
         if ($targetVer -and $zipName) {
             $zip = Join-Path $dist $zipName
-            if (Test-Path $zip) {
+            if (Test-Path -LiteralPath $zip) {
                 L "Premiere installation : version $targetVer."
                 $tmp = Join-Path $env:TEMP ('acboot_' + [guid]::NewGuid().ToString('N'))
-                Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
-                $inner = Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1
-                $srcContent = if ($inner) { $inner.FullName } else { $tmp }
-                if (-not (Test-Path $appDir)) { New-Item -ItemType Directory -Path $appDir -Force | Out-Null }
-                Copy-Item -Path (Join-Path $srcContent '*') -Destination $appDir -Recurse -Force
-                Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
-                L "Version $targetVer installee dans $appDir."
+                try {
+                    Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+                    $inner = Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1
+                    $srcContent = if ($inner) { $inner.FullName } else { $tmp }
+                    if (-not (Test-Path -LiteralPath $appDir)) { New-Item -ItemType Directory -Path $appDir -Force | Out-Null }
+                    Copy-Item -Path (Join-Path $srcContent '*') -Destination $appDir -Recurse -Force
+                    L "Version $targetVer installee dans $appDir."
+                } finally {
+                    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+                }
             } else { L "Zip introuvable : $zip" }
         } else { L "latest.json absent : impossible d'installer la premiere version." }
     }

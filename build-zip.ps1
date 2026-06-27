@@ -107,7 +107,8 @@ if (-not $NoGit) {
         Push-Location $repo
         $null = (& git rev-parse --is-inside-work-tree 2>$null)
         if ($LASTEXITCODE -eq 0) {
-            & git add -A 2>$null | Out-Null
+            & git add latest.json "Arrivee-Collab_version$ver.zip" .dist-launcher-history.json 2>$null | Out-Null
+            & git add -u 2>$null | Out-Null
             & git diff --cached --quiet 2>$null
             if ($LASTEXITCODE -ne 0) {
                 $msg = "Version $ver"
