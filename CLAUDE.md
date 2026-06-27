@@ -9,26 +9,68 @@ Outil d'automatisation SNCF pour l'onboarding de nouveaux collaborateurs. Applic
 ## Lancement
 
 ```powershell
-# Méthode recommandée (sans élévation UAC)
-# Double-cliquer sur "arrivée de collab.vbs"
+# Développement — lancer directement le script source
+powershell.exe -ExecutionPolicy Bypass -NoProfile -STA -File "ArriveeCollab-PS\arrivee collab.ps1"
 
-# Ou directement en PowerShell
-powershell.exe -ExecutionPolicy Bypass -NoProfile -File "arrivee collab.ps1"
+# Ou via le lanceur local (fenêtre masquée, sans élévation UAC)
+# Double-cliquer sur ArriveeCollab-PS\Start-ArriveeCollab.vbs
 
-# Créer un raccourci bureau (génère/régénère le fichier .vbs)
-.\CreerRaccourci.ps1
+# Exécuter les tests unitaires
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
+
+# Construire un zip de distribution versionné
+.\build-zip.ps1
 ```
 
-Pas de build, pas de tests, pas de linting — c'est un utilitaire autonome.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe/met à jour l'app sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance.
 
 ## Architecture
 
-**Tout le code applicatif est dans `arrivee collab.ps1`** (~1156 lignes). Il n'y a pas de modules externes.
+### Arborescence
 
-Le script suit une structure linéaire :
+```
+ArriveeCollab-PS/          ← code source
+  arrivee collab.ps1       ← script principal (~1156 lignes)
+  config.ps1               ← version de l'app + UpdateDir (URL OneDrive)
+  releases.json            ← changelog versionné
+  image-arrivee-collab.ico
+  Resources/               ← images embarquées dans le mail (obligatoire)
+  Start-ArriveeCollab.vbs  ← lanceur local (fenêtre masquée, développement)
+  Start-ArriveeCollab.cmd
+  lib/
+    Common.ps1             ← chemins data, log, Compare-AppVersion, Write-AppLog
+    State.ps1              ← state.json, migration de version
+
+dist-launcher/             ← fichiers à poser sur le OneDrive de distribution
+  Arrivee Collab.cmd       ← point d'entrée utilisateur final
+  Arrivee Collab.vbs
+  bootstrap.ps1            ← installe/met à jour l'app sous %LOCALAPPDATA%
+  LISEZMOI.txt
+
+build-zip.ps1              ← packaging : zip versionné + latest.json + dist-ready/
+latest.json                ← métadonnées de la dernière release
+tests/
+  Test-ArriveeCollab.ps1   ← tests unitaires (fonction Assert maison)
+docs/superpowers/          ← specs et plans de conception
+  specs/2026-06-27-versionning-maj-tutoriel-design.md
+  plans/2026-06-27-plan-a-fondation-distribution.md
+```
+
+### Modèle d'exécution
+
+L'app écrit toutes ses sorties sous `%LOCALAPPDATA%\Arrivee-Collab\` :
+- `app\` — copie de `ArriveeCollab-PS/` écrasée à chaque mise à jour
+- `data\Mot de passe\` — .txt et .zip temporaires du mot de passe
+- `data\Archive message\` — .msg archivés après envoi
+- `state.json` — état persistant (version installée…)
+- `app_debug.log` — journal de débogage
+
+### Structure du script principal
+
+`arrivee collab.ps1` suit une structure linéaire :
 1. Chargement assemblies .NET + déclaration de la classe C# inline `DarkTitleBar` (`Add-Type`)
-2. Génération du lanceur VBS (code de `CreerRaccourci.ps1` dupliqué inline)
-3. Résolution des chemins
+2. Import des modules `lib/Common.ps1` et `lib/State.ps1`, initialisation du contexte `$global:Ctx`
+3. Résolution des chemins (via `Get-AppDataDir` / `Get-AppWorkDir`)
 4. Définition de la palette de couleurs (`$c*`) + fonction `Show-AlertDialog`
 5. Vérification des ressources (via `Show-AlertDialog` thème sombre)
 6. Déclaration des fonctions métier et UI
@@ -77,15 +119,19 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 
 ### Scripts secondaires
 
-- **`arrivée de collab.vbs`** — Lanceur VBScript qui exécute le PS1 en mode fenêtre masquée sans élévation
-- **`CreerRaccourci.ps1`** — Génère (ou régénère) le fichier VBS lanceur. Note : ce code est aussi dupliqué inline dans le PS1 principal (lignes ~75-134)
+- **`ArriveeCollab-PS/Start-ArriveeCollab.vbs`** / **`.cmd`** — Lanceurs locaux (développement) : exécutent le PS1 en mode fenêtre masquée, sans élévation UAC
+- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le OneDrive, installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
+- **`build-zip.ps1`** — Packaging : crée un zip versionné (`Arrivee-Collab_version<X>.zip`), génère `latest.json`, peuple `dist-ready/` avec les bundles complets, et tente un commit/push vers `origin`
+- **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`
+- **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`
 
 ### Dossiers
 
-- `image-arrivee-collab.ico` — Icône de l'application (fenêtre principale + dialogues). Note : `CreerRaccourci.ps1` référence un nom différent (`arrivee-collab.ico`) pour le raccourci VBS.
-- `Resources/` — Images embarquées dans le mail (`image arrivee collab.jpg` + `Signature.png`). **Obligatoire** au lancement.
-- `Mot de passe/` — Fichiers temporaires (mot de passe .txt et .zip). Créé automatiquement.
-- `Archive message/` — Stockage des .msg envoyés. Créé automatiquement.
+- `ArriveeCollab-PS/image-arrivee-collab.ico` — Icône de l'application (fenêtre principale + dialogues)
+- `ArriveeCollab-PS/Resources/` — Images embarquées dans le mail (`image arrivee collab.jpg` + `Signature.png`). **Obligatoire** au lancement.
+- `%LOCALAPPDATA%\Arrivee-Collab\data\Mot de passe\` — Fichiers temporaires (mot de passe .txt et .zip). Créé automatiquement.
+- `%LOCALAPPDATA%\Arrivee-Collab\data\Archive message\` — Stockage des .msg envoyés. Créé automatiquement.
+- `docs/superpowers/` — Spécifications et plans de conception (voir `specs/` et `plans/`).
 
 ## Dépendances système
 
@@ -123,4 +169,5 @@ Boutons : `FlatStyle = 'Flat'`, `BorderSize = 0`, police Segoe UI SemiBold. Barr
 - L'adresse expéditeur configurée est `noreply.dsnu.asut.asuidf@sncf.fr`
 - Les liens dans le template HTML pointent vers le SharePoint interne SNCF
 - Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`, `$global:CopyDateInit`)
-- Le fichier .msg est nommé `{RITM}_notif.msg` à la racine du projet avant archivage
+- Le fichier .msg est nommé `{RITM}_notif.msg` dans `%LOCALAPPDATA%\Arrivee-Collab\` avant archivage
+- **Plan B (à venir)** : `lib/Update.ps1` (pastille MAJ, self-update, « Quoi de neuf »), `lib/Tutorial.ps1` (tutoriel interactif data-driven) — voir `docs/superpowers/specs/2026-06-27-versionning-maj-tutoriel-design.md`
