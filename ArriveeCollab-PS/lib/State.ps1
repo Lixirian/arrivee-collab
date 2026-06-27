@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  Persistance légère de l'état entre sessions (state.json) :
 #   - Version             : version de l'app ayant écrit l'état (déclenche « Quoi de neuf »)
 #   - NotesShownVersion   : version dont les notes ont déjà été montrées (anti-doublon)
