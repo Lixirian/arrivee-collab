@@ -1,4 +1,11 @@
-{
+﻿{
+    "1.3.0": [
+        "Champ « Nom et prénom » unique (au lieu de deux champs séparés).",
+        "Bouton pour replier l'objet, l'aperçu et la note ServiceNow — idéal sur petit écran.",
+        "Masquage de l'app : un bouton aspire la fenêtre dans une bulle ronde déplaçable posée au bord de l'écran ; clic pour revenir, glisser pour la déplacer, clic droit pour fermer.",
+        "Ouverture toujours sur l'écran principal et une seule instance à la fois.",
+        "Tutoriel enrichi (12 étapes) couvrant le repli de l'aperçu et le masquage en bulle."
+    ],
     "1.2.0": [
         "Tutoriel interactif : au premier lancement, un guide en 10 étapes présente l'outil ; chaque étape met en évidence la zone concernée.",
         "Bouton « ? » en haut à droite pour rejouer le tutoriel à tout moment."

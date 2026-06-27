@@ -2,6 +2,20 @@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+# --- Instance unique : empêche d'ouvrir plusieurs fenêtres/bulles simultanées ---
+# (En mode masqué l'app n'a ni croix ni entrée dans la barre des tâches : sans ce
+#  verrou, relancer le lanceur empilerait des instances et donc des bulles.)
+$global:AppCreatedNew = $false
+$global:AppMutex = New-Object System.Threading.Mutex($true, 'ArriveeCollaborateur_SingleInstance', [ref]$global:AppCreatedNew)
+if (-not $global:AppCreatedNew) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "L'outil « Arrivée Collaborateur » est déjà en cours d'exécution.`r`n`r`nSi la fenêtre n'est pas visible, cliquez sur la bulle située sur le bord droit de votre écran principal pour la ramener.",
+        "Arrivée Collaborateur",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+    exit
+}
+
 # --- Barre de titre sombre Windows 10/11 ---
 Add-Type -TypeDefinition @"
 using System;
@@ -427,7 +441,7 @@ function Attendre-FermetureOutlookEtDeplacer($cheminMsg) {
 }
 
 function Get-CorpsMessageHTML_Preview {
-    param($objet, $nom, $prenom, $cheminHeader, $cheminSignature)
+    param($objet, $nomPrenom, $cheminHeader, $cheminSignature)
     return @"
 <html>
 <head>
@@ -455,7 +469,7 @@ function Get-CorpsMessageHTML_Preview {
 <td style='vertical-align:top; padding-left:25px;'>
 <h2>Arrivée d'un Agent SNCF</h2>
 <p>Bonjour,</p>
-<p>Vous avez été identifié comme déclarant de l'arrivée de <b>$prenom $nom</b>, nouveau collaborateur dans l'entreprise.</p>
+<p>Vous avez été identifié comme déclarant de l'arrivée de <b>$nomPrenom</b>, nouveau collaborateur dans l'entreprise.</p>
 <p>Son compte lui permettant d'accéder aux applications SNCF vient d'être créé et son mot de passe sera effectif d'ici 30mn maximum.</p>
 <p><b>Merci de bien vouloir lui transmettre son mot de passe indiqué dans le fichier .zip en PJ</b> ainsi que les informations ci-après.</p>
 <p>Pour répondre aux règles de sécurité SNCF, ce mot de passe devra être modifié dès que possible via le site <b>Mon-ID SNCF</b>.</p>
@@ -481,7 +495,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 }
 
 function Get-CorpsMessageHTML_Final {
-    param($nom, $prenom, $cheminHeader, $cheminSignature)
+    param($nomPrenom, $cheminHeader, $cheminSignature)
     return @"
 <html>
 <head>
@@ -499,7 +513,7 @@ function Get-CorpsMessageHTML_Final {
 <td style='vertical-align:top; padding-left:25px;'>
 <h2>Arrivée d'un Agent SNCF</h2>
 <p>Bonjour,</p>
-<p>Vous avez été identifié comme déclarant de l'arrivée de <b>$prenom $nom</b>, nouveau collaborateur dans l'entreprise.</p>
+<p>Vous avez été identifié comme déclarant de l'arrivée de <b>$nomPrenom</b>, nouveau collaborateur dans l'entreprise.</p>
 <p>Son compte lui permettant d'accéder aux applications SNCF vient d'être créé et son mot de passe sera effectif d'ici 30mn maximum.</p>
 <p><b>Merci de bien vouloir lui transmettre son mot de passe indiqué dans le fichier .zip en PJ</b> ainsi que les informations ci-après.</p>
 <p>Pour répondre aux règles de sécurité SNCF, ce mot de passe devra être modifié dès que possible via le site <b>Mon-ID SNCF</b>.</p>
@@ -524,7 +538,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 }
 
 function Get-CorpsMessageHTML_DejaInit_Preview {
-    param($objet, $nom, $prenom, $dateInit, $cheminHeader, $cheminSignature)
+    param($objet, $nomPrenom, $dateInit, $cheminHeader, $cheminSignature)
     return @"
 <html>
 <head>
@@ -552,9 +566,9 @@ function Get-CorpsMessageHTML_DejaInit_Preview {
 <td style='vertical-align:top; padding-left:25px;'>
 <h2>Mouvement d'un Agent SNCF</h2>
 <p>Bonjour,</p>
-<p>Vous avez été identifié comme déclarant du mouvement de <b>$prenom $nom</b> nouveau collaborateur dans l'entreprise.</p>
+<p>Vous avez été identifié comme déclarant du mouvement de <b>$nomPrenom</b> nouveau collaborateur dans l'entreprise.</p>
 <p>Après vérification, un mot de passe est déjà présent sur le compte depuis le <b>$dateInit</b>, nous n'allons donc pas initialiser celui-ci.</p>
-<p>Si nécessaire, <b>$prenom $nom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
+<p>Si nécessaire, <b>$nomPrenom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
 <p>Merci de votre compréhension.</p>
 <div style='margin-top:20px; font-size:13px;'>
 Cordialement,<br/>
@@ -571,7 +585,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 }
 
 function Get-CorpsMessageHTML_DejaInit_Final {
-    param($nom, $prenom, $dateInit, $cheminHeader, $cheminSignature)
+    param($nomPrenom, $dateInit, $cheminHeader, $cheminSignature)
     return @"
 <html>
 <head>
@@ -589,9 +603,9 @@ function Get-CorpsMessageHTML_DejaInit_Final {
 <td style='vertical-align:top; padding-left:25px;'>
 <h2>Mouvement d'un Agent SNCF</h2>
 <p>Bonjour,</p>
-<p>Vous avez été identifié comme déclarant du mouvement de <b>$prenom $nom</b> nouveau collaborateur dans l'entreprise.</p>
+<p>Vous avez été identifié comme déclarant du mouvement de <b>$nomPrenom</b> nouveau collaborateur dans l'entreprise.</p>
 <p>Après vérification, un mot de passe est déjà présent sur le compte depuis le <b>$dateInit</b>, nous n'allons donc pas initialiser celui-ci.</p>
-<p>Si nécessaire, <b>$prenom $nom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
+<p>Si nécessaire, <b>$nomPrenom</b> peut le modifier via le site <a href='https://mon-id.sncf.fr'>mon-id.sncf.fr</a> et, en cas de problème, en appelant l'assistance mon compte au <b>0 980 980 321</b>.</p>
 <p>Merci de votre compréhension.</p>
 <div style='margin-top:20px; font-size:13px;'>
 Cordialement,<br/>
@@ -614,7 +628,7 @@ $form.StartPosition = "CenterScreen"
 $form.BackColor = $cBgMain
 $form.ForeColor = $cTextPrimary
 $form.Font = [Drawing.Font]::new("Segoe UI", 10)
-$form.MinimumSize = New-Object Drawing.Size(780, 650)
+$form.MinimumSize = New-Object Drawing.Size(1095, 650)
 # Icône personnalisée
 $iconPath = Join-Path $baseDir "image-arrivee-collab.ico"
 if (Test-Path $iconPath) {
@@ -695,7 +709,7 @@ function Update-UpdateBadge {
     $action = {
         if ($Ctx.UpdateAvailable) {
             $b.Text = "  ⬆ Mise à jour $($Ctx.UpdateAvailable.Version)  "
-            $b.Left = $btnHelp.Left - $b.Width - 10
+            $b.Left = $btnHide.Left - $b.Width - 10
             $b.Visible = $true; $b.BringToFront()
         } else { $b.Visible = $false }
     }
@@ -732,24 +746,15 @@ $txtEmail.Location = New-Object Drawing.Point($col2In, 15); $txtEmail.Width = $i
 $txtEmail.BackColor = $cSurface; $txtEmail.ForeColor = $cTextPrimary
 $txtEmail.BorderStyle = 'FixedSingle'; $txtEmail.Font = [Drawing.Font]::new("Segoe UI", 10)
 
-# Ligne 2 : Nom + Prénom
-$lblNom = New-Object Windows.Forms.Label
-$lblNom.Text = "Nom :"; $lblNom.AutoSize = $true
-$lblNom.Location = New-Object Drawing.Point($col1Lbl, 58)
-$lblNom.ForeColor = $cTextSecondary
-$txtNom = New-Object Windows.Forms.TextBox
-$txtNom.Location = New-Object Drawing.Point($col1In, 55); $txtNom.Width = $inW
-$txtNom.BackColor = $cSurface; $txtNom.ForeColor = $cTextPrimary
-$txtNom.BorderStyle = 'FixedSingle'; $txtNom.Font = [Drawing.Font]::new("Segoe UI", 10)
-
-$lblPrenom = New-Object Windows.Forms.Label
-$lblPrenom.Text = "Prénom :"; $lblPrenom.AutoSize = $true
-$lblPrenom.Location = New-Object Drawing.Point($col2Lbl, 58)
-$lblPrenom.ForeColor = $cTextSecondary
-$txtPrenom = New-Object Windows.Forms.TextBox
-$txtPrenom.Location = New-Object Drawing.Point($col2In, 55); $txtPrenom.Width = $inW
-$txtPrenom.BackColor = $cSurface; $txtPrenom.ForeColor = $cTextPrimary
-$txtPrenom.BorderStyle = 'FixedSingle'; $txtPrenom.Font = [Drawing.Font]::new("Segoe UI", 10)
+# Ligne 2 : Nom et prénom (champ unique, saisie « Prénom Nom »)
+$lblNomPrenom = New-Object Windows.Forms.Label
+$lblNomPrenom.Text = "Nom et prénom :"; $lblNomPrenom.AutoSize = $true
+$lblNomPrenom.Location = New-Object Drawing.Point($col1Lbl, 58)
+$lblNomPrenom.ForeColor = $cTextSecondary
+$txtNomPrenom = New-Object Windows.Forms.TextBox
+$txtNomPrenom.Location = New-Object Drawing.Point($col1In, 55); $txtNomPrenom.Width = $inW
+$txtNomPrenom.BackColor = $cSurface; $txtNomPrenom.ForeColor = $cTextPrimary
+$txtNomPrenom.BorderStyle = 'FixedSingle'; $txtNomPrenom.Font = [Drawing.Font]::new("Segoe UI", 10)
 
 # Images (droite du panneau)
 $picHeader = New-Object Windows.Forms.PictureBox
@@ -840,7 +845,7 @@ $chkMdpDejaInit.Add_CheckedChanged({
 
 $dtpDateInit.Add_ValueChanged({ Update-Preview })
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNom,$txtNom,$lblPrenom,$txtPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg))
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -854,15 +859,12 @@ function Layout-FormPanel {
     $inW = [Math]::Max(80, $colW - $labelW)
 
     $txtRITM.Width = $inW
-    $txtNom.Width = $inW
+    $txtNomPrenom.Width = $inW
 
     $c2x = $margin + $colW + $gap
     $lblEmail.Left = $c2x
     $txtEmail.Left = $c2x + $labelW
     $txtEmail.Width = $inW
-    $lblPrenom.Left = $c2x
-    $txtPrenom.Left = $c2x + $labelW
-    $txtPrenom.Width = $inW
 }
 $panelForm.Add_Resize({ Layout-FormPanel })
 Layout-FormPanel
@@ -922,8 +924,7 @@ $btnReset.Cursor = [Windows.Forms.Cursors]::Hand
 $btnReset.Add_Click({
     $txtRITM.Text = ""
     $txtEmail.Text = ""
-    $txtNom.Text = ""
-    $txtPrenom.Text = ""
+    $txtNomPrenom.Text = ""
     $txtPwd.Text = ""
     $chkMdpDejaInit.Checked = $false
     $btnGenPwd.Enabled = $true
@@ -1060,20 +1061,56 @@ $webBrowser.Dock = 'Fill'
 $webBrowser.ScriptErrorsSuppressed = $true
 $panelPreview.Controls.Add($webBrowser)
 
+# --- Bouton repli/dépli du bas (objet + aperçu + note ServiceNow) ---
+# Gagne de la place sur les petits écrans : un clic masque tout le bas et réduit
+# la hauteur de la fenêtre ; re-clic restaure.
+$global:PreviewCollapsed = $false
+$btnTogglePreview = New-Object Windows.Forms.Button
+$btnTogglePreview.Text = "▼ Aperçu"
+$btnTogglePreview.Location = New-Object Drawing.Point(870, 8)
+$btnTogglePreview.Size = New-Object Drawing.Size(160, 34)
+$btnTogglePreview.FlatStyle = 'Flat'
+$btnTogglePreview.FlatAppearance.BorderSize = 1
+$btnTogglePreview.FlatAppearance.BorderColor = $cBorder
+$btnTogglePreview.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(62, 62, 66)
+$btnTogglePreview.BackColor = $cBgSecondary
+$btnTogglePreview.ForeColor = $cTextPrimary
+$btnTogglePreview.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+$btnTogglePreview.Cursor = [Windows.Forms.Cursors]::Hand
+$btnTogglePreview.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$btnTogglePreview.Add_Click({
+    $global:PreviewCollapsed = -not $global:PreviewCollapsed
+    $vis = -not $global:PreviewCollapsed
+    $panelCopy.Visible = $vis
+    $lblSubjectLabel.Visible = $vis
+    $txtSubjectPreview.Visible = $vis
+    $lblPreviewLabel.Visible = $vis
+    $panelPreview.Visible = $vis
+    if ($global:PreviewCollapsed) {
+        $btnTogglePreview.Text = "▶ Aperçu"
+        $form.MinimumSize = New-Object Drawing.Size(1095, 300)
+        $form.Height = 332
+    } else {
+        $btnTogglePreview.Text = "▼ Aperçu"
+        $form.Height = 920
+        $form.MinimumSize = New-Object Drawing.Size(1095, 650)
+    }
+})
+$panelActions.Controls.Add($btnTogglePreview)
+
 # --- Logique de l'aperçu ---
 function Update-Preview {
     $ritm = if($txtRITM.Text){$txtRITM.Text}else{"RITMXXXXX"}
-    $nom = if($txtNom.Text){$txtNom.Text}else{"NOM"}
-    $prenom = if($txtPrenom.Text){$txtPrenom.Text}else{"PRENOM"}
+    $nomPrenom = if($txtNomPrenom.Text){$txtNomPrenom.Text}else{"Prénom NOM"}
     if ($chkMdpDejaInit.Checked) {
         $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
-        $objet = "$ritm - Mot de passe déjà initialisé $nom $prenom"
+        $objet = "$ritm - Mot de passe déjà initialisé $nomPrenom"
         $txtSubjectPreview.Text = $objet
-        $html = Get-CorpsMessageHTML_DejaInit_Preview $objet $nom $prenom $dateInit $cheminHeader $cheminSignature
+        $html = Get-CorpsMessageHTML_DejaInit_Preview $objet $nomPrenom $dateInit $cheminHeader $cheminSignature
     } else {
-        $objet = "$ritm - Notification mot de passe $nom $prenom"
+        $objet = "$ritm - Notification mot de passe $nomPrenom"
         $txtSubjectPreview.Text = $objet
-        $html = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
+        $html = Get-CorpsMessageHTML_Preview $objet $nomPrenom $cheminHeader $cheminSignature
     }
     $webBrowser.DocumentText = $html
 }
@@ -1084,16 +1121,16 @@ $btnGenPwd.Add_Click({
     $txtPwd.Text = $pw
     Copy-Clipboard $pw
     Show-AlertDialog -message "Le mot de passe a été généré et copié dans le presse-papiers." -title "Mot de passe généré"
-    $nomPrenom = "$($txtNom.Text)$($txtPrenom.Text)"
-    $global:CheminFichierTxt = Creer-FichierMotDePasse $pw $nomPrenom
-    $global:CheminZip = Creer-Zip $global:CheminFichierTxt $nomPrenom
+    $nomFichier = ($txtNomPrenom.Text -replace '\s', '')
+    $global:CheminFichierTxt = Creer-FichierMotDePasse $pw $nomFichier
+    $global:CheminZip = Creer-Zip $global:CheminFichierTxt $nomFichier
     Update-Preview
     $btnGenMsg.Enabled = $true
 })
 
 $btnGenMsg.Add_Click({
-    $ritm = $txtRITM.Text.Trim(); $nom = $txtNom.Text.Trim(); $prenom = $txtPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
-    if ($ritm -eq "" -or $nom -eq "" -or $prenom -eq "" -or $dest -eq "") {
+    $ritm = $txtRITM.Text.Trim(); $nomPrenom = $txtNomPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
+    if ($ritm -eq "" -or $nomPrenom -eq "" -or $dest -eq "") {
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
         return
     }
@@ -1101,9 +1138,9 @@ $btnGenMsg.Add_Click({
     if ($chkMdpDejaInit.Checked) {
         # --- Mode : mot de passe déjà initialisé ---
         $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
-        $objet = "$ritm - Mot de passe déjà initialisé $nom $prenom"
-        $htmlFinal = Get-CorpsMessageHTML_DejaInit_Final $nom $prenom $dateInit $cheminHeader $cheminSignature
-        $htmlPreview = Get-CorpsMessageHTML_DejaInit_Preview $objet $nom $prenom $dateInit $cheminHeader $cheminSignature
+        $objet = "$ritm - Mot de passe déjà initialisé $nomPrenom"
+        $htmlFinal = Get-CorpsMessageHTML_DejaInit_Final $nomPrenom $dateInit $cheminHeader $cheminSignature
+        $htmlPreview = Get-CorpsMessageHTML_DejaInit_Preview $objet $nomPrenom $dateInit $cheminHeader $cheminSignature
         $webBrowser.DocumentText = $htmlPreview
         $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
@@ -1133,9 +1170,9 @@ $btnGenMsg.Add_Click({
             Show-AlertDialog -message "Générez le mot de passe d'abord." -title "Erreur"
             return
         }
-        $objet = "$ritm - Notification mot de passe $nom $prenom"
-        $htmlFinal = Get-CorpsMessageHTML_Final $nom $prenom $cheminHeader $cheminSignature
-        $htmlPreview = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
+        $objet = "$ritm - Notification mot de passe $nomPrenom"
+        $htmlFinal = Get-CorpsMessageHTML_Final $nomPrenom $cheminHeader $cheminSignature
+        $htmlPreview = Get-CorpsMessageHTML_Preview $objet $nomPrenom $cheminHeader $cheminSignature
         $webBrowser.DocumentText = $htmlPreview
         $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal $global:CheminZip $cheminMsg) {
@@ -1163,7 +1200,7 @@ $btnGenMsg.Add_Click({
     }
 })
 
-foreach ($c in @($txtRITM, $txtNom, $txtPrenom, $txtEmail)) {
+foreach ($c in @($txtRITM, $txtNomPrenom, $txtEmail)) {
     $c.Add_TextChanged({Update-Preview})
 }
 
@@ -1191,4 +1228,261 @@ $form.Add_Shown({
     $timerTuto.Start()
 })
 
-[void]$form.ShowDialog()
+# ============================================================================
+#  Masquage de l'app : un bouton « masquer » (en-tête) fait coulisser la fenêtre
+#  hors écran vers la droite, puis affiche une petite LANGUETTE au bord droit de
+#  l'écran de l'app. Clic sur la languette : l'app revient en glissant. La languette
+#  n'apparaît QUE pendant le masquage. Tout est recalculé au clic (correct multi-écran).
+# ============================================================================
+$global:AppHidden = $false
+# Dernière position de la bulle ($null = jamais déplacée => position par défaut).
+$global:BubbleLastPos = $null
+# Position d'apparition résolue au masquage + bounds pleins de l'app (pour l'animation).
+$global:BubbleNextPos = $null
+$global:BubbleSide = 'Right'
+$global:AppFullBounds = $null
+
+# Bouton « masquer » dans l'en-tête (à gauche du bouton « ? »).
+$btnHide = New-Object Windows.Forms.Button
+$btnHide.Text = "»"
+$btnHide.Size = New-Object Drawing.Size(34, 34)
+$btnHide.Location = New-Object Drawing.Point(1002, 18)
+$btnHide.FlatStyle = 'Flat'; $btnHide.FlatAppearance.BorderSize = 0
+$btnHide.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
+$btnHide.BackColor = $cBorder; $btnHide.ForeColor = $cWhite
+$btnHide.Font = [Drawing.Font]::new("Segoe UI", 12, [Drawing.FontStyle]::Bold)
+$btnHide.Cursor = [Windows.Forms.Cursors]::Hand
+$btnHide.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$form.Controls.Add($btnHide)
+$btnHide.BringToFront()
+
+# Bulle RONDE flottante (style « bulle de discussion ») avec l'icône de l'app. Cachée
+# par défaut ; n'apparaît qu'une fois l'app masquée.
+$bubble = New-Object Windows.Forms.Form
+$bubble.FormBorderStyle = 'None'; $bubble.ShowInTaskbar = $false
+$bubble.StartPosition = 'Manual'; $bubble.TopMost = $true
+# Windows impose une largeur mini de fenêtre (~136 px) : sans lever cette contrainte,
+# la bulle resterait large de 136 px (cercle clippé à gauche => bulle « décalée »).
+$bubble.MinimumSize = New-Object Drawing.Size(1, 1)
+$bubble.AutoScaleMode = 'None'
+$bubble.Size = New-Object Drawing.Size(54, 54)
+$bubble.BackColor = [Drawing.Color]::White
+$bpath = New-Object Drawing.Drawing2D.GraphicsPath
+$bpath.AddEllipse(0, 0, 54, 54)
+$bubble.Region = New-Object Drawing.Region($bpath)
+$bubble.Cursor = [Windows.Forms.Cursors]::Hand
+
+$picBubble = New-Object Windows.Forms.PictureBox
+$picBubble.Dock = 'Fill'; $picBubble.SizeMode = 'StretchImage'
+$picBubble.BackColor = [Drawing.Color]::White
+$picBubble.Cursor = [Windows.Forms.Cursors]::Hand
+# Avatar = SEULEMENT la TÊTE de la conseillère, recadrée depuis l'en-tête paysage
+# (qui contient aussi un robot et le buste). Rect calé sur le visage détecté (35,14,80,80).
+try {
+    if (Test-Path $cheminHeader) {
+        $srcAvatar = New-Object Drawing.Bitmap($cheminHeader)
+        $crop = New-Object Drawing.Rectangle(35, 14, 80, 80)
+        $picBubble.Image = $srcAvatar.Clone($crop, $srcAvatar.PixelFormat)
+        $srcAvatar.Dispose()
+    } elseif ($picHeader.Image) { $picBubble.Image = $picHeader.Image }
+} catch { if ($picHeader.Image) { $picBubble.Image = $picHeader.Image } }
+$bubble.Controls.Add($picBubble)
+
+# --- Déplacement de la bulle à la souris (comme les bulles de discussion Messenger) ---
+# On distingue un simple clic (=> afficher l'app) d'un glisser (=> repositionner la bulle).
+# Un glisser au-delà de 5 px verrouille le mode déplacement ; au relâchement la bulle
+# s'aimante au bord gauche/droit le plus proche de l'écran où elle se trouve.
+$dragState = @{ Dragging = $false; Moved = $false; OffX = 0; OffY = 0; DownX = 0; DownY = 0 }
+$picBubble.Add_MouseDown({
+    param($s, $e)
+    if ($e.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
+    $dragState.Dragging = $true
+    $dragState.Moved = $false
+    $dragState.OffX = $e.X
+    $dragState.OffY = $e.Y
+    $p = [Windows.Forms.Cursor]::Position
+    $dragState.DownX = $p.X; $dragState.DownY = $p.Y
+})
+$picBubble.Add_MouseMove({
+    param($s, $e)
+    if (-not $dragState.Dragging) { return }
+    $p = [Windows.Forms.Cursor]::Position
+    if (-not $dragState.Moved -and ([Math]::Abs($p.X - $dragState.DownX) -gt 5 -or [Math]::Abs($p.Y - $dragState.DownY) -gt 5)) {
+        $dragState.Moved = $true
+    }
+    $bubble.Location = New-Object Drawing.Point(($p.X - $dragState.OffX), ($p.Y - $dragState.OffY))
+})
+$picBubble.Add_MouseUp({
+    param($s, $e)
+    if ($e.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
+    if (-not $dragState.Dragging) { return }
+    $dragState.Dragging = $false
+    if ($dragState.Moved) {
+        # Aimantation au bord gauche/droit le plus proche de l'écran courant.
+        $cx = $bubble.Left + [int]($bubble.Width / 2)
+        $cy = $bubble.Top + [int]($bubble.Height / 2)
+        $wa = [Windows.Forms.Screen]::FromPoint((New-Object Drawing.Point($cx, $cy))).WorkingArea
+        $y = [Math]::Max($wa.Top, [Math]::Min($bubble.Top, $wa.Bottom - $bubble.Height))
+        if ($cx -lt ($wa.Left + $wa.Width / 2)) { $x = $wa.Left + 8; $global:BubbleSide = 'Left' } else { $x = $wa.Right - $bubble.Width - 8; $global:BubbleSide = 'Right' }
+        $bubble.Location = New-Object Drawing.Point([int]$x, [int]$y)
+        # Mémorise la position + le côté pour la prochaine animation et le prochain masquage.
+        $global:BubbleLastPos = $bubble.Location
+    } else {
+        Show-App
+    }
+})
+
+# ============================================================================
+#  Animation « trou noir » : au masquage, une IMAGE FANTÔME de l'app est aspirée
+#  (rétrécit + s'estompe) vers le centre de la BULLE ; à l'affichage, elle ré-émerge
+#  de la bulle en grandissant. Le point focal est la bulle (pas le bord d'écran),
+#  ce qui supprime tout calcul de bord et tout débordement multi-écran. Le vrai
+#  formulaire n'est jamais redimensionné (pas de jank de layout) : on anime un
+#  fantôme = capture d'écran de la fenêtre.
+# ============================================================================
+$ghost = New-Object Windows.Forms.Form
+$ghost.FormBorderStyle = 'None'; $ghost.ShowInTaskbar = $false
+$ghost.StartPosition = 'Manual'; $ghost.TopMost = $true
+$ghost.MinimumSize = New-Object Drawing.Size(1, 1)
+$ghost.AutoScaleMode = 'None'
+$picGhost = New-Object Windows.Forms.PictureBox
+$picGhost.Dock = 'Fill'; $picGhost.SizeMode = 'StretchImage'
+$ghost.Controls.Add($picGhost)
+
+# Capture pixel-fidèle de la fenêtre (inclut le WebBrowser d'aperçu) dans le fantôme.
+function Capture-FormToGhost {
+    try {
+        $b = $form.Bounds
+        $bmp = New-Object Drawing.Bitmap($b.Width, $b.Height)
+        $g = [Drawing.Graphics]::FromImage($bmp)
+        $g.CopyFromScreen($b.X, $b.Y, 0, 0, $b.Size)
+        $g.Dispose()
+        $old = $picGhost.Image; $picGhost.Image = $bmp; if ($old) { $old.Dispose() }
+    } catch { }
+}
+
+# Interpolation linéaire de rectangles (t dans [0,1]).
+function Get-LerpRect($a, $b, $t) {
+    $x = [int]($a.X + ($b.X - $a.X) * $t)
+    $y = [int]($a.Y + ($b.Y - $a.Y) * $t)
+    $w = [Math]::Max(1, [int]($a.Width + ($b.Width - $a.Width) * $t))
+    $h = [Math]::Max(1, [int]($a.Height + ($b.Height - $a.Height) * $t))
+    return New-Object Drawing.Rectangle($x, $y, $w, $h)
+}
+
+# Petit rectangle « trou noir » centré sur la bulle (point d'aspiration / d'émergence).
+function Get-BlackHoleRect($BubblePos, $Bw, $Bh) {
+    $cx = $BubblePos.X + [int]($Bw / 2); $cy = $BubblePos.Y + [int]($Bh / 2)
+    return New-Object Drawing.Rectangle(($cx - 8), ($cy - 8), 16, 16)
+}
+
+$slideTimer = New-Object Windows.Forms.Timer
+$slideTimer.Interval = 11
+$slideState = @{ Frame = 0; Total = 15; Hiding = $false; FromRect = $null; ToRect = $null }
+$slideTimer.Add_Tick({
+    $slideState.Frame++
+    $t = $slideState.Frame / $slideState.Total
+    if ($t -gt 1) { $t = 1 }
+    if ($slideState.Hiding) {
+        $e = $t * $t                          # aspiration : accélère vers la bulle
+        $ghost.Opacity = 1.0 - 0.65 * $t
+    } else {
+        $e = 1 - (1 - $t) * (1 - $t)          # émergence : décélère en arrivant
+        $ghost.Opacity = 0.35 + 0.65 * $t
+    }
+    $ghost.Bounds = Get-LerpRect $slideState.FromRect $slideState.ToRect $e
+    if ($slideState.Frame -ge $slideState.Total) {
+        $slideTimer.Stop()
+        if ($slideState.Hiding) {
+            $global:AppHidden = $true
+            $bubble.Location = $global:BubbleNextPos
+            $global:BubbleLastPos = $global:BubbleNextPos
+            $bubble.TopMost = $true
+            $bubble.Show(); $bubble.BringToFront()
+            $ghost.Hide()
+            $bubble.Activate()
+        } else {
+            $form.Bounds = $global:AppFullBounds
+            $form.Show(); $form.Activate()
+            $global:AppHidden = $false
+            $ghost.Hide()
+        }
+    }
+}.GetNewClosure())
+
+function Hide-App {
+    if ($slideTimer.Enabled -or $global:AppHidden) { return }
+    # Résout la position d'apparition de la bulle (mémorisée, sinon défaut bord droit).
+    $bw = $bubble.Width; $bh = $bubble.Height
+    $pos = $global:BubbleLastPos; $valid = $false
+    if ($null -ne $pos) {
+        $vc = New-Object Drawing.Point(($pos.X + [int]($bw / 2)), ($pos.Y + [int]($bh / 2)))
+        if ([Windows.Forms.SystemInformation]::VirtualScreen.Contains($vc)) { $valid = $true }
+    }
+    if (-not $valid) {
+        $wa = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+        $pos = New-Object Drawing.Point(($wa.Right - $bw - 8), [int]($wa.Top + ($wa.Height - $bh) / 2))
+    }
+    $global:BubbleNextPos = $pos
+    # Capture l'app, montre le fantôme à taille pleine (identique => sans rupture),
+    # puis cache le vrai formulaire. L'animation l'aspire ensuite vers la bulle.
+    $global:AppFullBounds = $form.Bounds
+    Capture-FormToGhost
+    $slideState.FromRect = $global:AppFullBounds
+    $slideState.ToRect = Get-BlackHoleRect $pos $bw $bh
+    $slideState.Frame = 0; $slideState.Hiding = $true
+    $ghost.Bounds = $global:AppFullBounds
+    $ghost.Opacity = 1.0
+    $ghost.Show(); $ghost.BringToFront()
+    $form.Hide()
+    $slideTimer.Start()
+}
+function Show-App {
+    if (-not $global:AppHidden -or $slideTimer.Enabled) { return }
+    # Le fantôme ré-émerge de la bulle (petit) vers les bounds d'origine de l'app.
+    $start = Get-BlackHoleRect $bubble.Location $bubble.Width $bubble.Height
+    $bubble.Hide()
+    $slideState.FromRect = $start
+    $slideState.ToRect = $global:AppFullBounds
+    $slideState.Frame = 0; $slideState.Hiding = $false
+    $ghost.Bounds = $start
+    $ghost.Opacity = 0.35
+    $ghost.Show(); $ghost.BringToFront()
+    $slideTimer.Start()
+}
+
+$btnHide.Add_Click({ Hide-App })
+# (le clic simple sur la bulle est géré par MouseUp ci-dessus : tap = afficher, glisser = déplacer)
+
+# Clic-DROIT sur la bulle : menu pour afficher ou fermer l'app même en mode masqué
+# (sans ce menu, une app masquée n'a aucun moyen d'être fermée -> instances empilées).
+$bubbleMenu = New-Object Windows.Forms.ContextMenuStrip
+$bubbleMenu.BackColor = $cBgSecondary
+$bubbleMenu.ForeColor = $cTextPrimary
+$bubbleMenu.ShowImageMargin = $false
+$miShow = $bubbleMenu.Items.Add("Afficher l'application")
+$miShow.add_Click({ Show-App })
+$miClose = $bubbleMenu.Items.Add("Fermer l'application")
+$miClose.add_Click({ $global:AppHidden = $false; $bubble.Hide(); $form.Close() })
+$bubble.ContextMenuStrip = $bubbleMenu
+$picBubble.ContextMenuStrip = $bubbleMenu
+
+$form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
+
+# Démarrage TOUJOURS centré sur l'écran principal — UNE SEULE fois (sinon le re-Show
+# de la languette recentrerait l'app au lieu de la laisser glisser).
+$global:AppFirstShown = $false
+$form.Add_Shown({
+    if ($global:AppFirstShown) { return }
+    $global:AppFirstShown = $true
+    try {
+        $pa = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+        $x = [int]($pa.X + ($pa.Width - $form.Width) / 2)
+        $y = [Math]::Max($pa.Y, [int]($pa.Y + ($pa.Height - $form.Height) / 2))
+        $form.Location = New-Object Drawing.Point($x, $y)
+    } catch { }
+})
+
+# Boucle principale : Application::Run (et non ShowDialog) pour que la languette
+# reste active à côté de la fenêtre principale.
+[Windows.Forms.Application]::Run($form)

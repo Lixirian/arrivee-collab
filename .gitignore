@@ -7,3 +7,6 @@ dist-ready/
 Arrivee-Collab-dist-ready.zip
 Arrivee-Collab-maj-*.zip
 Archives/
+
+# Terminal Paste Image folder
+.cp-images/
