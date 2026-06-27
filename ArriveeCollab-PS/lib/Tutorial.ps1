@@ -15,7 +15,7 @@ function Get-TutorialSteps {
     param($Ctx)
     return @(
         @{ Icon = ([char]::ConvertFromUtf32(0x1F44B)); Title = 'Bienvenue'
-           Text  = "Cet outil prépare l'arrivée d'un collaborateur SNCF : il génère un mot de passe, crée l'e-mail de notification (.msg) et la note ServiceNow. Faisons un tour rapide - à chaque étape, la zone concernée est entourée en violet."
+           Text  = "Cet outil prépare l'arrivée d'un collaborateur SNCF : il génère un mot de passe, crée l'e-mail de notification (.msg) et la note ServiceNow. Faisons un tour rapide — à chaque étape, la zone concernée est entourée en violet."
            Target = { $null } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4DD)); Title = 'Les informations à saisir'
            Text  = "Renseignez ici le RITM, l'adresse e-mail du demandeur, le nom et le prénom du nouveau collaborateur. L'aperçu du message se met à jour en temps réel."

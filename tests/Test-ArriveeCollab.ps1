@@ -97,6 +97,7 @@ $steps = @(Get-TutorialSteps @{ })
 Assert (@($steps).Count -eq 10) 'tuto : 10 etapes'
 Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
 Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
+Assert (@($steps | Where-Object { -not $_.Icon }).Count -eq 0)  'tuto : chaque etape a une icone'
 Assert ($null -ne $steps[1].Target) 'tuto : etape 2 a une cible (scriptblock)'
 
 # Test-TutorialDue : pas vu -> du ; vu version courante -> pas du ; contenu plus recent -> du
