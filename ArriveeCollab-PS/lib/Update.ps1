@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  Mise à jour automatique depuis un dossier de DISTRIBUTION (OneDrive/SharePoint).
 #  AUCUNE API, AUCUN jeton : on lit de simples FICHIERS (latest.json + zips).
 #  Ce fichier = LOGIQUE de détection + changelog hors-ligne. Les DIALOGUES WinForms
