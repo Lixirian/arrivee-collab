@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  Génère le zip de distribution de l'outil Arrivée Collaborateur.
 #  - Lit la version dans ArriveeCollab-PS\config.ps1 ($Config.Version).
 #  - Produit  Arrivee-Collab_version<X>.zip  à la racine (dossier racine interne = même nom).
