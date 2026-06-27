@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe/met à jour l'app sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures seront gérées via une pastille in-app (Plan B, à venir).
 
 ## Architecture
 
@@ -44,7 +44,7 @@ ArriveeCollab-PS/          ← code source
 dist-launcher/             ← fichiers à poser sur le OneDrive de distribution
   Arrivee Collab.cmd       ← point d'entrée utilisateur final
   Arrivee Collab.vbs
-  bootstrap.ps1            ← installe/met à jour l'app sous %LOCALAPPDATA%
+  bootstrap.ps1            ← première installation de l'app sous %LOCALAPPDATA%
   LISEZMOI.txt
 
 build-zip.ps1              ← packaging : zip versionné + latest.json + dist-ready/
@@ -59,7 +59,7 @@ docs/superpowers/          ← specs et plans de conception
 ### Modèle d'exécution
 
 L'app écrit toutes ses sorties sous `%LOCALAPPDATA%\Arrivee-Collab\` :
-- `app\` — copie de `ArriveeCollab-PS/` écrasée à chaque mise à jour
+- `app\` — copie de `ArriveeCollab-PS/` (sera écrasée lors des mises à jour futures — Plan B)
 - `data\Mot de passe\` — .txt et .zip temporaires du mot de passe
 - `data\Archive message\` — .msg archivés après envoi
 - `state.json` — état persistant (version installée…)
