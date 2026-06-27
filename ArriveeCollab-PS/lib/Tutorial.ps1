@@ -80,3 +80,133 @@ function Show-TutorialIfFirstRun {
         Show-Tutorial $Ctx
     } catch { Write-AppLog "[TUTO] Lancement KO : $($_.Exception.Message)" }
 }
+
+# ============================================================================
+#  RENDU WinForms : carte d'explication (dark) + cadre de surbrillance (anneau
+#  violet via Region) autour du contrôle ciblé. Deux Forms TopMost NON modaux ;
+#  $form est désactivé pendant le tutoriel et réactivé à la fermeture.
+# ============================================================================
+function Show-Tutorial {
+    param($Ctx)
+    $steps = @(Get-TutorialSteps $Ctx)
+    $n = $steps.Count
+    if ($n -eq 0) { return }
+
+    # --- Cadre de surbrillance : Form anneau violet, repositionné par étape ---
+    $frame = New-Object Windows.Forms.Form
+    $frame.FormBorderStyle = 'None'; $frame.ShowInTaskbar = $false
+    $frame.StartPosition = 'Manual'; $frame.TopMost = $true
+    $frame.BackColor = $cAccentViolet
+    $frame.Enabled = $false   # purement décoratif (pas d'interaction)
+
+    # --- Carte d'explication : Form dark avec liseré violet ---
+    $card = New-Object Windows.Forms.Form
+    $card.FormBorderStyle = 'None'; $card.ShowInTaskbar = $false
+    $card.StartPosition = 'Manual'; $card.TopMost = $true
+    $card.Size = New-Object Drawing.Size(450, 250)
+    $card.BackColor = $cBgMain
+    $card.Add_Paint({ param($s, $e)
+        $pen = New-Object Drawing.Pen($cAccentViolet, 2)
+        $e.Graphics.DrawRectangle($pen, 1, 1, $s.ClientSize.Width - 3, $s.ClientSize.Height - 3)
+        $pen.Dispose()
+    })
+
+    $lblStep = New-Object Windows.Forms.Label
+    $lblStep.Location = New-Object Drawing.Point(20, 16); $lblStep.AutoSize = $true
+    $lblStep.ForeColor = $cTextSecondary; $lblStep.Font = [Drawing.Font]::new("Segoe UI", 8, [Drawing.FontStyle]::Bold)
+
+    $lblIcon = New-Object Windows.Forms.Label
+    $lblIcon.Location = New-Object Drawing.Point(18, 32); $lblIcon.AutoSize = $true
+    $lblIcon.Font = [Drawing.Font]::new("Segoe UI Emoji", 20)
+
+    $lblTitle = New-Object Windows.Forms.Label
+    $lblTitle.Location = New-Object Drawing.Point(62, 38); $lblTitle.Size = New-Object Drawing.Size(372, 28)
+    $lblTitle.ForeColor = $cWhite; $lblTitle.Font = [Drawing.Font]::new("Segoe UI", 13, [Drawing.FontStyle]::Bold)
+
+    $lblText = New-Object Windows.Forms.Label
+    $lblText.Location = New-Object Drawing.Point(20, 74); $lblText.Size = New-Object Drawing.Size(410, 96)
+    $lblText.ForeColor = $cTextPrimary; $lblText.Font = [Drawing.Font]::new("Segoe UI", 10)
+
+    $dotsPanel = New-Object Windows.Forms.Panel
+    $dotsPanel.Location = New-Object Drawing.Point(20, 176); $dotsPanel.Size = New-Object Drawing.Size(410, 12)
+    $dotsPanel.BackColor = $cBgMain
+    $dots = @()
+    for ($d = 0; $d -lt $n; $d++) {
+        $dot = New-Object Windows.Forms.Panel
+        $dot.Size = New-Object Drawing.Size(8, 8); $dot.Location = New-Object Drawing.Point(($d * 15), 2)
+        $dot.BackColor = $cBorder
+        $dotsPanel.Controls.Add($dot); $dots += $dot
+    }
+
+    $btnSkip = New-Object Windows.Forms.Button
+    $btnSkip.Text = "Passer"; $btnSkip.Location = New-Object Drawing.Point(20, 202); $btnSkip.Size = New-Object Drawing.Size(80, 32)
+    $btnSkip.FlatStyle = 'Flat'; $btnSkip.FlatAppearance.BorderSize = 0; $btnSkip.BackColor = $cBgSecondary
+    $btnSkip.ForeColor = $cTextSecondary; $btnSkip.Cursor = [Windows.Forms.Cursors]::Hand
+
+    $btnPrev = New-Object Windows.Forms.Button
+    $btnPrev.Text = ("$([char]::ConvertFromUtf32(0x25C0)) Précédent"); $btnPrev.Location = New-Object Drawing.Point(232, 202); $btnPrev.Size = New-Object Drawing.Size(102, 32)
+    $btnPrev.FlatStyle = 'Flat'; $btnPrev.FlatAppearance.BorderSize = 0; $btnPrev.BackColor = $cBorder
+    $btnPrev.ForeColor = $cTextPrimary; $btnPrev.Cursor = [Windows.Forms.Cursors]::Hand
+
+    $btnNext = New-Object Windows.Forms.Button
+    $btnNext.Location = New-Object Drawing.Point(342, 202); $btnNext.Size = New-Object Drawing.Size(88, 32)
+    $btnNext.FlatStyle = 'Flat'; $btnNext.FlatAppearance.BorderSize = 0; $btnNext.BackColor = $cAccentViolet
+    $btnNext.ForeColor = $cWhite; $btnNext.Cursor = [Windows.Forms.Cursors]::Hand
+    $btnNext.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+
+    $card.Controls.AddRange(@($lblStep, $lblIcon, $lblTitle, $lblText, $dotsPanel, $btnSkip, $btnPrev, $btnNext))
+
+    $st = @{ I = 0 }
+
+    $render = {
+        $i = $st.I; $step = $steps[$i]
+        $lblStep.Text = ("ÉTAPE {0} / {1}" -f ($i + 1), $n)
+        $lblIcon.Text = [string]$step.Icon
+        $lblTitle.Text = [string]$step.Title
+        $lblText.Text = [string]$step.Text
+        for ($d = 0; $d -lt $n; $d++) { $dots[$d].BackColor = if ($d -eq $i) { $cAccentViolet } else { $cBorder } }
+        $btnPrev.Visible = ($i -gt 0)
+        $btnNext.Text = if ($i -ge ($n - 1)) { "Terminer $([char]::ConvertFromUtf32(0x2713))" } else { "Suivant $([char]::ConvertFromUtf32(0x25B6))" }
+
+        $target = $null; try { if ($step.Target) { $target = & $step.Target } } catch { }
+        $rect = Get-ControlScreenRect $target
+        $area = [Windows.Forms.Screen]::FromControl($card).WorkingArea
+        if ($rect) {
+            $pad = 5; $bw = 3
+            $fx = $rect.X - $pad - $bw; $fy = $rect.Y - $pad - $bw
+            $fw = $rect.Width + 2 * ($pad + $bw); $fh = $rect.Height + 2 * ($pad + $bw)
+            $frame.Bounds = New-Object Drawing.Rectangle($fx, $fy, $fw, $fh)
+            $reg = New-Object Drawing.Region(New-Object Drawing.Rectangle(0, 0, $fw, $fh))
+            $reg.Exclude((New-Object Drawing.Rectangle($bw, $bw, $fw - 2 * $bw, $fh - 2 * $bw)))
+            $frame.Region = $reg
+            $frame.Visible = $true; $frame.BringToFront()
+            $cx = [Math]::Max($area.Left + 10, [Math]::Min($rect.X, $area.Right - $card.Width - 10))
+            if (($fy + $fh + 12 + $card.Height) -le $area.Bottom) { $cy = $fy + $fh + 12 }
+            elseif (($fy - 12 - $card.Height) -ge $area.Top) { $cy = $fy - 12 - $card.Height }
+            else { $cy = [int](($area.Top + $area.Bottom - $card.Height) / 2) }
+            $card.Location = New-Object Drawing.Point([int]$cx, [int]$cy)
+        } else {
+            $frame.Visible = $false
+            $card.Location = New-Object Drawing.Point([int](($area.Left + $area.Right - $card.Width) / 2), [int](($area.Top + $area.Bottom - $card.Height) / 2))
+        }
+        $card.BringToFront(); $card.Activate()
+    }.GetNewClosure()
+
+    $finish = {
+        try { $Ctx.State.TutorialSeen = $true; $Ctx.State.TutorialSeenVersion = $script:TutorialVersion; Save-AppState $Ctx.State } catch { }
+        try { $form.Enabled = $true } catch { }
+        try { $frame.Close() } catch { }
+        try { $card.Close() } catch { }
+    }.GetNewClosure()
+
+    $btnSkip.Add_Click($finish)
+    $btnPrev.Add_Click({ if ($st.I -gt 0) { $st.I--; & $render } }.GetNewClosure())
+    $btnNext.Add_Click({ if ($st.I -lt ($n - 1)) { $st.I++; & $render } else { & $finish } }.GetNewClosure())
+    # Sécurité : si la carte est fermée autrement (Alt+F4), réactiver le principal + fermer le cadre.
+    $card.Add_FormClosed({ try { $frame.Close() } catch { }; try { $form.Enabled = $true } catch { } }.GetNewClosure())
+
+    try { $form.Enabled = $false } catch { }
+    $frame.Show(); $card.Show()
+    & $render
+    $card.Activate()
+}
