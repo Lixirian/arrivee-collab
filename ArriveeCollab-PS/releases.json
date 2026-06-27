@@ -1,4 +1,8 @@
 {
+    "1.2.0": [
+        "Tutoriel interactif : au premier lancement, un guide en 10 étapes présente l'outil ; chaque étape met en évidence la zone concernée.",
+        "Bouton « ? » en haut à droite pour rejouer le tutoriel à tout moment."
+    ],
     "1.1.0": [
         "Mise à jour automatique : une pastille signale les nouvelles versions ; un clic présente les nouveautés puis installe la mise à jour et redémarre l'application.",
         "Dialogue « Quoi de neuf » affiché après chaque mise à jour."

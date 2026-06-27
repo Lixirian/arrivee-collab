@@ -125,6 +125,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 - **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`
 - **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`
 - **`lib/Update.ps1`** — détection MAJ, pastille, dialogues, self-update, Quoi de neuf
+- **`lib/Tutorial.ps1`** — tutoriel interactif data-driven (carte + surbrillance) : s'affiche automatiquement au premier lancement (~1,4 s après ouverture) et peut être rejoué à tout moment via le bouton « ? » en haut à droite. Versionné (`$script:TutorialVersion`) ; 10 étapes définies dans `Get-TutorialSteps`, état persisté dans `state.json` (`TutorialSeen` / `TutorialSeenVersion`)
 
 ### Dossiers
 
@@ -171,4 +172,3 @@ Boutons : `FlatStyle = 'Flat'`, `BorderSize = 0`, police Segoe UI SemiBold. Barr
 - Les liens dans le template HTML pointent vers le SharePoint interne SNCF
 - Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`, `$global:CopyDateInit`)
 - Le fichier .msg est nommé `{RITM}_notif.msg` dans `%LOCALAPPDATA%\Arrivee-Collab\` avant archivage
-- **Plan C (à venir)** : `lib/Tutorial.ps1` (tutoriel interactif data-driven) — voir `docs/superpowers/specs/2026-06-27-versionning-maj-tutoriel-design.md`
