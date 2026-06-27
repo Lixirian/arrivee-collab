@@ -85,6 +85,7 @@ if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
 . (Join-Path $baseDir 'config.ps1')
 . (Join-Path $baseDir 'lib\Common.ps1')
 . (Join-Path $baseDir 'lib\State.ps1')
+. (Join-Path $baseDir 'lib\Update.ps1')
 
 # Données d'exécution hors du dossier app (qui est écrasé à chaque MAJ) :
 # %LOCALAPPDATA%\Arrivee-Collab pour l'état/log, ...\data pour les sorties métier.
@@ -653,6 +654,38 @@ $lblSubTitle.Location = New-Object Drawing.Point(27, 45)
 $lblSubTitle.AutoSize = $true
 $form.Controls.Add($lblSubTitle)
 
+# --- Pastille de mise à jour (cachée par défaut, ancrée en haut à droite) ---
+$lblUpdateBadge = New-Object Windows.Forms.Label
+$lblUpdateBadge.Text = "  ⬆ Mise à jour disponible  "
+$lblUpdateBadge.AutoSize = $true
+$lblUpdateBadge.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$lblUpdateBadge.ForeColor = $cWhite
+$lblUpdateBadge.BackColor = $cWarning
+$lblUpdateBadge.Padding = New-Object Windows.Forms.Padding(6, 4, 6, 4)
+$lblUpdateBadge.Location = New-Object Drawing.Point(900, 22)
+$lblUpdateBadge.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$lblUpdateBadge.Cursor = [Windows.Forms.Cursors]::Hand
+$lblUpdateBadge.Visible = $false
+$lblUpdateBadge.Add_Click({ Invoke-PromptAndUpdate $global:Ctx })
+$form.Controls.Add($lblUpdateBadge)
+$lblUpdateBadge.BringToFront()
+$global:Ctx.UpdateBadge = $lblUpdateBadge
+
+# Repositionne la pastille en haut à droite quel que soit son texte (largeur auto).
+function Update-UpdateBadge {
+    param($Ctx)
+    $b = $Ctx.UpdateBadge
+    if (-not $b) { return }
+    $action = {
+        if ($Ctx.UpdateAvailable) {
+            $b.Text = "  ⬆ Mise à jour $($Ctx.UpdateAvailable.Version)  "
+            $b.Left = $form.ClientSize.Width - $b.Width - 25
+            $b.Visible = $true; $b.BringToFront()
+        } else { $b.Visible = $false }
+    }
+    if ($form.InvokeRequired) { $form.Invoke([Action]$action) } else { & $action }
+}
+
 # --- Panneau formulaire (fond secondaire) ---
 $panelForm = New-Object Windows.Forms.Panel
 $panelForm.Location = New-Object Drawing.Point(20, 75)
@@ -1119,4 +1152,19 @@ foreach ($c in @($txtRITM, $txtNom, $txtPrenom, $txtEmail)) {
 }
 
 Update-Preview
+
+# --- Mise à jour : « Quoi de neuf » après une montée, puis vérification périodique ---
+$global:Ctx.UpdateAvailable = $null
+$form.Add_Shown({
+    try { Show-WhatsNewIfUpgraded $global:Ctx $global:PrevStateVersion } catch { Write-AppLog "[VERSION] Quoi de neuf KO : $($_.Exception.Message)" }
+    # 1er contrôle ~8 s après ouverture, puis selon Config.UpdateCheckIntervalSec.
+    $timerUpd = New-Object Windows.Forms.Timer
+    $timerUpd.Interval = 8000
+    $timerUpd.Add_Tick({
+        $this.Interval = [Math]::Max(10, [int]$global:Ctx.Config.UpdateCheckIntervalSec) * 1000
+        try { Invoke-UpdateCheck $global:Ctx } catch { Write-AppLog "[MAJ] Tick KO : $($_.Exception.Message)" }
+    })
+    $timerUpd.Start()
+})
+
 [void]$form.ShowDialog()
