@@ -1,4 +1,4 @@
-# Tests hors-ligne des unités pures d'Arrivée Collaborateur. Aucun GUI, aucun COM.
+﻿# Tests hors-ligne des unités pures d'Arrivée Collaborateur. Aucun GUI, aucun COM.
 $ErrorActionPreference = 'Stop'
 $lib = Join-Path $PSScriptRoot '..\ArriveeCollab-PS\lib'
 . (Join-Path $lib 'Common.ps1')
