@@ -81,6 +81,12 @@ try {
     $ctx.Config.Version = '1.2.0'
     Invoke-UpdateCheck $ctx
     Assert ($null -eq $ctx.UpdateAvailable) 'update : pas de MAJ si deja a jour'
+
+    # Zip annonce mais absent -> pas de MAJ
+    $ctx.Config.Version = '1.1.0'
+    Remove-Item -LiteralPath (Join-Path $dist 'Arrivee-Collab_version1.2.0.zip') -Force
+    Invoke-UpdateCheck $ctx
+    Assert ($null -eq $ctx.UpdateAvailable) 'update : pas de MAJ si zip absent'
 } finally {
     if (Test-Path $tmpRoot) { Remove-Item $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }

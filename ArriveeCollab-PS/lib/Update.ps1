@@ -130,8 +130,9 @@ function Invoke-UpdateCheck {
     try {
         $m = Get-LatestManifest $Ctx
         if ($m -and (Compare-AppVersion $m.Version $Ctx.Config.Version) -gt 0) {
-            $zipPath = Join-Path (Get-UpdateDir $Ctx) $m.Zip
-            if (Test-Path -LiteralPath $zipPath) {
+            $dir = Get-UpdateDir $Ctx
+            $zipPath = if ($dir) { Join-Path $dir $m.Zip } else { $null }
+            if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {
                 if (-not $Ctx.UpdateAvailable -or $Ctx.UpdateAvailable.Version -ne $m.Version) {
                     Write-AppLog ("[MAJ] Nouvelle version disponible : {0} (actuelle {1})." -f $m.Version, $Ctx.Config.Version)
                 }
