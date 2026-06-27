@@ -109,7 +109,7 @@ function Show-Tutorial {
         $pen = New-Object Drawing.Pen($cAccentViolet, 2)
         $e.Graphics.DrawRectangle($pen, 1, 1, $s.ClientSize.Width - 3, $s.ClientSize.Height - 3)
         $pen.Dispose()
-    })
+    }.GetNewClosure())
 
     $lblStep = New-Object Windows.Forms.Label
     $lblStep.Location = New-Object Drawing.Point(20, 16); $lblStep.AutoSize = $true
@@ -178,7 +178,9 @@ function Show-Tutorial {
             $frame.Bounds = New-Object Drawing.Rectangle($fx, $fy, $fw, $fh)
             $reg = New-Object Drawing.Region(New-Object Drawing.Rectangle(0, 0, $fw, $fh))
             $reg.Exclude((New-Object Drawing.Rectangle($bw, $bw, $fw - 2 * $bw, $fh - 2 * $bw)))
+            $oldReg = $frame.Region
             $frame.Region = $reg
+            if ($oldReg) { $oldReg.Dispose() }
             $frame.Visible = $true; $frame.BringToFront()
             $cx = [Math]::Max($area.Left + 10, [Math]::Min($rect.X, $area.Right - $card.Width - 10))
             if (($fy + $fh + 12 + $card.Height) -le $area.Bottom) { $cy = $fy + $fh + 12 }
