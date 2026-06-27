@@ -86,6 +86,7 @@ if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
 . (Join-Path $baseDir 'lib\Common.ps1')
 . (Join-Path $baseDir 'lib\State.ps1')
 . (Join-Path $baseDir 'lib\Update.ps1')
+. (Join-Path $baseDir 'lib\Tutorial.ps1')
 
 # Données d'exécution hors du dossier app (qui est écrasé à chaque MAJ) :
 # %LOCALAPPDATA%\Arrivee-Collab pour l'état/log, ...\data pour les sorties métier.
@@ -671,6 +672,21 @@ $form.Controls.Add($lblUpdateBadge)
 $lblUpdateBadge.BringToFront()
 $global:Ctx.UpdateBadge = $lblUpdateBadge
 
+# --- Bouton « ? » : rejouer le tutoriel (en-tête, ancré en haut à droite) ---
+$btnHelp = New-Object Windows.Forms.Button
+$btnHelp.Text = "?"
+$btnHelp.Size = New-Object Drawing.Size(34, 34)
+$btnHelp.Location = New-Object Drawing.Point(1055, 18)
+$btnHelp.FlatStyle = 'Flat'; $btnHelp.FlatAppearance.BorderSize = 0
+$btnHelp.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
+$btnHelp.BackColor = $cBorder; $btnHelp.ForeColor = $cWhite
+$btnHelp.Font = [Drawing.Font]::new("Segoe UI", 12, [Drawing.FontStyle]::Bold)
+$btnHelp.Cursor = [Windows.Forms.Cursors]::Hand
+$btnHelp.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$btnHelp.Add_Click({ try { Show-Tutorial $global:Ctx } catch { Write-AppLog "[TUTO] Relecture KO : $($_.Exception.Message)" } })
+$form.Controls.Add($btnHelp)
+$btnHelp.BringToFront()
+
 # Repositionne la pastille en haut à droite quel que soit son texte (largeur auto).
 function Update-UpdateBadge {
     param($Ctx)
@@ -1165,6 +1181,14 @@ $form.Add_Shown({
         try { Invoke-UpdateCheck $global:Ctx } catch { Write-AppLog "[MAJ] Tick KO : $($_.Exception.Message)" }
     })
     $timerUpd.Start()
+    # Tutoriel au tout premier lancement (différé ~1,4 s pour laisser l'UI se peindre).
+    $timerTuto = New-Object Windows.Forms.Timer
+    $timerTuto.Interval = 1400
+    $timerTuto.Add_Tick({
+        $this.Stop()
+        try { Show-TutorialIfFirstRun $global:Ctx } catch { Write-AppLog "[TUTO] 1er lancement KO : $($_.Exception.Message)" }
+    })
+    $timerTuto.Start()
 })
 
 [void]$form.ShowDialog()
