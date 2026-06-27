@@ -72,67 +72,6 @@ try { [DarkTitleBar]::EnableAppDarkMode() } catch {}
 try { [DarkTitleBar]::SetAppId("SNCF.ArriveeCollaborateur") } catch {}
 try { [DarkTitleBar]::HookCalendarPopup() } catch {}
 
-# --- Lanceur VBS portable sans élévation pour l'arrivée collab ---
-
-# Nom du script principal à lancer (ici le script d'arrivée collab)
-$mainScriptName = "arrivee collab.ps1"
-
-# Récupérer le dossier courant du script principal
-$scriptDirectory = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
-
-# Vérifier que le script principal existe
-$mainScriptPath = Join-Path -Path $scriptDirectory -ChildPath $mainScriptName
-if (-not (Test-Path $mainScriptPath)) {
-    Write-Error "Le script principal '$mainScriptName' est introuvable dans le dossier '$scriptDirectory'."
-    exit 1
-}
-
-# Nom du fichier VBS à générer
-$vbsLauncherName = "arrivée de collab.vbs"
-$vbsLauncherPath = Join-Path -Path $scriptDirectory -ChildPath $vbsLauncherName
-
-# Contenu du lanceur VBS sans élévation
-$vbsContent = @"
-' Lanceur portable pour $mainScriptName (sans élévation)
-Option Explicit
-
-Dim WShell, FSO, CurrentPath, ScriptFile, PowerShellExe
-
-Set WShell = CreateObject("WScript.Shell")
-Set FSO = CreateObject("Scripting.FileSystemObject")
-
-CurrentPath = FSO.GetParentFolderName(WScript.ScriptFullName) & "\"
-ScriptFile = CurrentPath & "$mainScriptName"
-PowerShellExe = "powershell.exe"
-
-If Not FSO.FileExists(ScriptFile) Then
-    MsgBox "Erreur : Le fichier '$mainScriptName' est introuvable dans " & CurrentPath, vbCritical, "Fichier manquant"
-    WScript.Quit
-End If
-
-WShell.Run """" & PowerShellExe & """ -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File """ & ScriptFile & """", 0, False
-
-Set FSO = Nothing
-Set WShell = Nothing
-"@
-
-# Création du VBS avec encodage ASCII
-Set-Content -Path $vbsLauncherPath -Value $vbsContent -Encoding ASCII
-
-if (Test-Path $vbsLauncherPath) {
-    Write-Host "`nLanceur VBS portable créé avec succès : $vbsLauncherPath" -ForegroundColor Green
-    Write-Host "Ce lanceur est totalement portable, et ne demande pas de droits administrateur." -ForegroundColor Cyan
-    Write-Host "Double-cliquez sur '$vbsLauncherName' pour lancer le script d'arrivée collaborateur." -ForegroundColor Cyan
-
-    # Si une icône est présente, informer l'utilisateur sur la méthode manuelle
-    $iconPath = Join-Path -Path $scriptDirectory -ChildPath "arrivee-collab.ico"
-    if (Test-Path $iconPath) {
-        Write-Host "Note : pour attribuer une icône, clic droit > Propriétés > Changer d'icône... > choisissez 'arrivee-collab.ico'." -ForegroundColor Yellow
-    }
-} else {
-    Write-Error "Erreur lors de la création du lanceur VBS!"
-}
-
 # Détermination du bon dossier de base, que ce soit .ps1 ou .exe ou terminal ouvert ailleurs
 if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
     $baseDir = Split-Path -Parent ([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
@@ -142,10 +81,37 @@ if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
     $baseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
+# --- Chargement de la configuration et des utilitaires (modules lib) ---
+. (Join-Path $baseDir 'config.ps1')
+. (Join-Path $baseDir 'lib\Common.ps1')
+. (Join-Path $baseDir 'lib\State.ps1')
+
+# Données d'exécution hors du dossier app (qui est écrasé à chaque MAJ) :
+# %LOCALAPPDATA%\Arrivee-Collab pour l'état/log, ...\data pour les sorties métier.
+$dataDir = Get-AppDataDir
+$workDir = Get-AppWorkDir $dataDir
+Initialize-AppLog (Join-Path $dataDir 'app_debug.log')
+Write-AppLog "[INIT] App : $baseDir | Données : $dataDir"
+
+# Contexte global partagé (étendu par le Plan B : pastille MAJ, tutoriel).
+$global:Ctx = @{
+    Config          = $Config
+    AppRoot         = $baseDir
+    DataDir         = $dataDir
+    WorkDir         = $workDir
+    State           = (New-AppState (Join-Path $dataDir 'state.json'))
+    UpdateAvailable = $null
+}
+
+# Migration « comme une mise à jour » (no-op si même version) : déclenchera le
+# dialogue « Quoi de neuf » au Plan B. On capture la version précédente AVANT.
+$global:PrevStateVersion = [string]$global:Ctx.State.Version
+[void](Invoke-AppVersionMigration $global:Ctx.State $Config.Version)
+
 # Chemins dossiers et fichiers importants
 $resourcesFolder = Join-Path $baseDir "Resources"
-$motDePasseFolder = Join-Path $baseDir "Mot de passe"
-$archiveFolder = Join-Path $baseDir "Archive message"
+$motDePasseFolder = Join-Path $workDir "Mot de passe"
+$archiveFolder = Join-Path $workDir "Archive message"
 
 # --- Palette de couleurs (thème sombre style LixiSpace) ---
 $cBgMain       = [Drawing.Color]::FromArgb(30, 30, 30)
@@ -1090,7 +1056,7 @@ $btnGenMsg.Add_Click({
         $htmlFinal = Get-CorpsMessageHTML_DejaInit_Final $nom $prenom $dateInit $cheminHeader $cheminSignature
         $htmlPreview = Get-CorpsMessageHTML_DejaInit_Preview $objet $nom $prenom $dateInit $cheminHeader $cheminSignature
         $webBrowser.DocumentText = $htmlPreview
-        $cheminMsg = Join-Path $baseDir "$ritm`_notif.msg"
+        $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
@@ -1122,7 +1088,7 @@ $btnGenMsg.Add_Click({
         $htmlFinal = Get-CorpsMessageHTML_Final $nom $prenom $cheminHeader $cheminSignature
         $htmlPreview = Get-CorpsMessageHTML_Preview $objet $nom $prenom $cheminHeader $cheminSignature
         $webBrowser.DocumentText = $htmlPreview
-        $cheminMsg = Join-Path $baseDir "$ritm`_notif.msg"
+        $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal $global:CheminZip $cheminMsg) {
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
