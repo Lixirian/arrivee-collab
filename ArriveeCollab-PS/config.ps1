@@ -7,7 +7,7 @@ $Config = @{
     # Version de l'application. À INCRÉMENTER à chaque build (build-zip.ps1).
     # Au lancement, si elle diffère de la version persistée dans state.json,
     # l'app déclenche le dialogue « Quoi de neuf » (via lib/Update.ps1).
-    Version                = '1.4.0'
+    Version                = '1.4.1'
 
     # Dossier de DISTRIBUTION OneDrive contenant latest.json + les zips versionnés.
     # AUCUNE API, AUCUN jeton : simple lecture de fichiers (lecture seule côté équipe).

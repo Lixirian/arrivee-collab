@@ -1167,16 +1167,15 @@ $btnCopyCollapsed.Cursor = [Windows.Forms.Cursors]::Hand
 $btnCopyCollapsed.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $btnCopyCollapsed.Visible = $false
 $btnCopyCollapsed.Add_Click({
-    # Les deux notes sont copiées comme deux parties distinctes (en-têtes + séparation).
-    $tout = @(
-        "----- Note ServiceNow -----",
-        (Get-CopyBlockText),
-        "",
-        "----- Note Utilisateur -----",
-        (Get-MessageDemandeurText)
-    ) -join "`r`n"
-    [System.Windows.Forms.Clipboard]::SetText($tout)
-    $this.Text = "Copié !"
+    # Deux copies SUCCESSIVES -> deux entrées distinctes dans l'historique du
+    # presse-papiers (Win+V), messages bruts (sans en-tête). On copie la note
+    # Utilisateur PUIS la note ServiceNow : Ctrl+V colle directement la note
+    # ServiceNow, et Win+V propose en plus la note Utilisateur. Le petit délai
+    # laisse le service d'historique capturer la 1re avant qu'elle soit remplacée.
+    [System.Windows.Forms.Clipboard]::SetText((Get-MessageDemandeurText))
+    Start-Sleep -Milliseconds 150
+    [System.Windows.Forms.Clipboard]::SetText((Get-CopyBlockText))
+    $this.Text = "Copié ×2 !"
     $this.BackColor = [Drawing.Color]::FromArgb(39, 174, 96)
     $t = New-Object Windows.Forms.Timer
     $t.Interval = 900; $t.Tag = $this

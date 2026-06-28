@@ -1,4 +1,7 @@
 ﻿{
+    "1.4.1": [
+        "« Copier tout » (aperçu replié) place désormais la note ServiceNow et la note Utilisateur comme deux copies distinctes dans l'historique du presse-papiers (Win+V), pour les coller séparément en un seul clic."
+    ],
     "1.4.0": [
         "Nouvel encart « Note Utilisateur » à côté de la note ServiceNow : un message de clôture prêt à copier pour le demandeur, dont le texte s'adapte au mode (mot de passe envoyé ou déjà initialisé).",
         "Quand l'aperçu est replié, un bouton « Copier tout » copie la note ServiceNow et la note Utilisateur en deux parties distinctes.",

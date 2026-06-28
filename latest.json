@@ -1,10 +1,7 @@
 ﻿{
-    "version":  "1.4.0",
-    "zip":  "Arrivee-Collab_version1.4.0.zip",
+    "version":  "1.4.1",
+    "zip":  "Arrivee-Collab_version1.4.1.zip",
     "notes":  [
-                  "Nouvel encart « Note Utilisateur » à côté de la note ServiceNow : un message de clôture prêt à copier pour le demandeur, dont le texte s\u0027adapte au mode (mot de passe envoyé ou déjà initialisé).",
-                  "Quand l\u0027aperçu est replié, un bouton « Copier tout » copie la note ServiceNow et la note Utilisateur en deux parties distinctes.",
-                  "Animation de masquage revue : la fenêtre tourbillonne et s\u0027aspire dans la bulle (effet vortex), avec un rendu plus doux.",
-                  "Tutoriel enrichi (13 étapes) présentant la note Utilisateur."
+                  "« Copier tout » (aperçu replié) place désormais la note ServiceNow et la note Utilisateur comme deux copies distinctes dans l\u0027historique du presse-papiers (Win+V), pour les coller séparément en un seul clic."
               ]
 }
