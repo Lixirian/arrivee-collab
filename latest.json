@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.4.1",
-    "zip":  "Arrivee-Collab_version1.4.1.zip",
+    "version":  "1.4.2",
+    "zip":  "Arrivee-Collab_version1.4.2.zip",
     "notes":  [
-                  "« Copier tout » (aperçu replié) place désormais la note ServiceNow et la note Utilisateur comme deux copies distinctes dans l\u0027historique du presse-papiers (Win+V), pour les coller séparément en un seul clic."
+                  "Correctif « Copier tout » : les deux notes arrivent désormais bien dans l\u0027historique du presse-papiers (Win+V). La copie de la note ServiceNow est légèrement différée pour que Windows enregistre aussi la note Utilisateur."
               ]
 }

@@ -1,4 +1,7 @@
 ﻿{
+    "1.4.2": [
+        "Correctif « Copier tout » : les deux notes arrivent désormais bien dans l'historique du presse-papiers (Win+V). La copie de la note ServiceNow est légèrement différée pour que Windows enregistre aussi la note Utilisateur."
+    ],
     "1.4.1": [
         "« Copier tout » (aperçu replié) place désormais la note ServiceNow et la note Utilisateur comme deux copies distinctes dans l'historique du presse-papiers (Win+V), pour les coller séparément en un seul clic."
     ],

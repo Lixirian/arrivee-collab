@@ -1167,23 +1167,27 @@ $btnCopyCollapsed.Cursor = [Windows.Forms.Cursors]::Hand
 $btnCopyCollapsed.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $btnCopyCollapsed.Visible = $false
 $btnCopyCollapsed.Add_Click({
-    # Deux copies SUCCESSIVES -> deux entrées distinctes dans l'historique du
-    # presse-papiers (Win+V), messages bruts (sans en-tête). On copie la note
-    # Utilisateur PUIS la note ServiceNow : Ctrl+V colle directement la note
-    # ServiceNow, et Win+V propose en plus la note Utilisateur. Le petit délai
-    # laisse le service d'historique capturer la 1re avant qu'elle soit remplacée.
+    # « Copier tout » = DEUX copies -> deux entrées distinctes dans l'historique du
+    # presse-papiers (Win+V), messages bruts (sans en-tête).
+    #   1) note Utilisateur copiée tout de suite ;
+    #   2) note ServiceNow copiée en DIFFÉRÉ via un Timer.
+    # Le différé est INDISPENSABLE : il laisse la boucle de messages tourner pour que
+    # le service d'historique Windows (cbdhsvc) « photographie » la 1re copie AVANT
+    # qu'elle soit remplacée par la 2e. Un Start-Sleep bloquant échoue (seule la
+    # dernière note survit). Résultat : Ctrl+V colle la note ServiceNow (dernière
+    # copiée), et Win+V propose aussi la note Utilisateur.
     [System.Windows.Forms.Clipboard]::SetText((Get-MessageDemandeurText))
-    Start-Sleep -Milliseconds 150
-    [System.Windows.Forms.Clipboard]::SetText((Get-CopyBlockText))
     $this.Text = "Copié ×2 !"
     $this.BackColor = [Drawing.Color]::FromArgb(39, 174, 96)
     $t = New-Object Windows.Forms.Timer
-    $t.Interval = 900; $t.Tag = $this
+    $t.Interval = 350; $t.Tag = $this
     $t.Add_Tick({
+        $this.Stop()
         $btn = $this.Tag
+        try { [System.Windows.Forms.Clipboard]::SetText((Get-CopyBlockText)) } catch {}
         $btn.Text = "📋  Copier tout (Note ServiceNow + Note Utilisateur)"
         $btn.BackColor = [Drawing.Color]::FromArgb(155, 89, 182)
-        $this.Stop(); $this.Dispose()
+        $this.Dispose()
     })
     $t.Start()
 })
