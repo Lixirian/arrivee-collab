@@ -1,11 +1,10 @@
 ﻿{
-    "version":  "1.3.0",
-    "zip":  "Arrivee-Collab_version1.3.0.zip",
+    "version":  "1.4.0",
+    "zip":  "Arrivee-Collab_version1.4.0.zip",
     "notes":  [
-                  "Champ « Nom et prénom » unique (au lieu de deux champs séparés).",
-                  "Bouton pour replier l\u0027objet, l\u0027aperçu et la note ServiceNow — idéal sur petit écran.",
-                  "Masquage de l\u0027app : un bouton aspire la fenêtre dans une bulle ronde déplaçable posée au bord de l\u0027écran ; clic pour revenir, glisser pour la déplacer, clic droit pour fermer.",
-                  "Ouverture toujours sur l\u0027écran principal et une seule instance à la fois.",
-                  "Tutoriel enrichi (12 étapes) couvrant le repli de l\u0027aperçu et le masquage en bulle."
+                  "Nouvel encart « Note Utilisateur » à côté de la note ServiceNow : un message de clôture prêt à copier pour le demandeur, dont le texte s\u0027adapte au mode (mot de passe envoyé ou déjà initialisé).",
+                  "Quand l\u0027aperçu est replié, un bouton « Copier tout » copie la note ServiceNow et la note Utilisateur en deux parties distinctes.",
+                  "Animation de masquage revue : la fenêtre tourbillonne et s\u0027aspire dans la bulle (effet vortex), avec un rendu plus doux.",
+                  "Tutoriel enrichi (13 étapes) présentant la note Utilisateur."
               ]
 }

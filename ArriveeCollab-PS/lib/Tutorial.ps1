@@ -1,13 +1,13 @@
 ﻿# ============================================================================
 #  Tutoriel interactif : au PREMIER lancement (et re-jouable via le bouton « ? »),
-#  présente l'outil en 12 étapes. Chaque étape met en évidence le vrai contrôle
+#  présente l'outil en 13 étapes. Chaque étape met en évidence le vrai contrôle
 #  (cadre violet) avec une carte d'explication à côté. Rendu WinForms (Task 2).
 # ============================================================================
 
 # Version du CONTENU du tutoriel. À INCRÉMENTER à chaque modification de
 # Get-TutorialSteps : un utilisateur ayant vu une version plus ancienne le revoit
 # une fois au lancement (bouton « Passer » disponible).
-$script:TutorialVersion = 3
+$script:TutorialVersion = 4
 
 # Étapes data-driven. Icon = caractère (ConvertFromUtf32, robuste à l'encodage).
 # Target = scriptblock renvoyant le contrôle à encadrer (ou $null pour une carte centrée).
@@ -36,10 +36,13 @@ function Get-TutorialSteps {
            Text  = "Après la création du .msg, une fenêtre vous demande l'adresse de messagerie et l'OU du bénéficiaire (liste déroulante des entités SudEst) pour compléter la note ServiceNow."
            Target = { $null } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4CB)); Title = 'La note ServiceNow'
-           Text  = "Ce panneau affiche la note prête à coller dans ServiceNow. Le bouton « Copier tout » la place dans le presse-papiers en un clic."
+           Text  = "Ce panneau affiche la note prête à coller dans ServiceNow. Le bouton « Copier » la place dans le presse-papiers en un clic."
            Target = { $panelCopy } }
+        @{ Icon = ([char]::ConvertFromUtf32(0x1F4C4)); Title = 'La note Utilisateur'
+           Text  = "Juste à droite, ce panneau affiche le message de clôture à transmettre au demandeur. Son texte s'adapte au mode (mot de passe envoyé ou déjà initialisé). Le bouton « Copier » le place dans le presse-papiers."
+           Target = { $panelMsg } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F441)); Title = "Replier l'aperçu"
-           Text  = "Ce bouton replie l'objet, l'aperçu du message et la note ServiceNow pour réduire la fenêtre — pratique sur un petit écran de portable. Recliquez pour les réafficher."
+           Text  = "Ce bouton replie l'objet, l'aperçu du message et les deux notes pour réduire la fenêtre — pratique sur un petit écran de portable. Une fois replié, un bouton « Copier tout » apparaît pour copier d'un coup la note ServiceNow et la note Utilisateur. Recliquez pour tout réafficher."
            Target = { $btnTogglePreview } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F504)); Title = 'Réinitialiser'
            Text  = "Ce bouton vide tous les champs pour traiter une nouvelle arrivée sans relancer l'application."

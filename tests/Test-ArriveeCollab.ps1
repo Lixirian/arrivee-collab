@@ -94,7 +94,7 @@ try {
 # --- Tutoriel : étapes + décision d'affichage ---
 . (Join-Path $lib 'Tutorial.ps1')
 $steps = @(Get-TutorialSteps @{ })
-Assert (@($steps).Count -eq 12) 'tuto : 12 etapes'
+Assert (@($steps).Count -eq 13) 'tuto : 13 etapes'
 Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
 Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
 Assert (@($steps | Where-Object { -not $_.Icon }).Count -eq 0)  'tuto : chaque etape a une icone'

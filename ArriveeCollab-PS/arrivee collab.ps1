@@ -643,6 +643,7 @@ $form.Add_Shown({
         [DarkTitleBar]::ApplyDarkScrollbar($panelForm.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($panelActions.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($rtbCopy.Handle)
+        [DarkTitleBar]::ApplyDarkScrollbar($rtbMsg.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($dtpDateInit.Handle)
     } catch {}
 })
@@ -942,12 +943,12 @@ $btnReset.Add_Click({
 
 $panelActions.Controls.AddRange(@($btnGenPwd, $txtPwd, $btnGenMsg, $btnReset))
 
-# --- Panneau d'éléments à copier ---
+# --- Panneau d'éléments à copier (Note ServiceNow, à gauche) ---
 $panelCopy = New-Object Windows.Forms.Panel
 $panelCopy.Location = New-Object Drawing.Point(20, 290)
-$panelCopy.Size = New-Object Drawing.Size(1045, 137)
+$panelCopy.Size = New-Object Drawing.Size(615, 137)
 $panelCopy.BackColor = $cBgSecondary
-$panelCopy.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$panelCopy.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left
 $form.Controls.Add($panelCopy)
 
 $lblCopyTitle = New-Object Windows.Forms.Label
@@ -980,9 +981,27 @@ function Get-CopyBlockText {
     ) -join "`r`n"
 }
 
+# Message de clôture à destination du demandeur (« Note Utilisateur »).
+# Le texte change selon le mode (case « Mot de passe déjà initialisé »).
+function Get-MessageDemandeurText {
+    if ($chkMdpDejaInit.Checked) {
+        $corps = "Le compte est bien activé. Le mot de passe n'a pas été modifié, car il avait déjà été initialisé."
+    } else {
+        $corps = "Le compte a bien été activé. Le mot de passe a été envoyé par mail au demandeur."
+    }
+    return @(
+        "Bonjour,",
+        "",
+        $corps,
+        "",
+        "Cordialement,",
+        "L'assistance bureautique."
+    ) -join "`r`n"
+}
+
 $rtbCopy = New-Object Windows.Forms.RichTextBox
 $rtbCopy.Location = New-Object Drawing.Point(15, 26)
-$rtbCopy.Size = New-Object Drawing.Size(920, 102)
+$rtbCopy.Size = New-Object Drawing.Size(490, 102)
 $rtbCopy.BackColor = $cSurface
 $rtbCopy.ForeColor = $cTextPrimary
 $rtbCopy.Font = [Drawing.Font]::new("Segoe UI", 9)
@@ -992,8 +1011,8 @@ $rtbCopy.Text = Get-CopyBlockText
 $rtbCopy.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 
 $btnCopyAll = New-Object Windows.Forms.Button
-$btnCopyAll.Text = "Copier tout"
-$btnCopyAll.Location = New-Object Drawing.Point(945, 26)
+$btnCopyAll.Text = "Copier"
+$btnCopyAll.Location = New-Object Drawing.Point(515, 26)
 $btnCopyAll.Size = New-Object Drawing.Size(85, 102)
 $btnCopyAll.FlatStyle = 'Flat'
 $btnCopyAll.FlatAppearance.BorderSize = 0
@@ -1019,6 +1038,76 @@ $btnCopyAll.Add_Click({
 })
 
 $panelCopy.Controls.AddRange(@($lblCopyTitle, $rtbCopy, $btnCopyAll))
+
+# --- Panneau « Note Utilisateur » (message au demandeur, à droite) ---
+$panelMsg = New-Object Windows.Forms.Panel
+$panelMsg.Location = New-Object Drawing.Point(650, 290)
+$panelMsg.Size = New-Object Drawing.Size(415, 137)
+$panelMsg.BackColor = $cBgSecondary
+$panelMsg.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left
+$form.Controls.Add($panelMsg)
+
+$lblMsgTitle = New-Object Windows.Forms.Label
+$lblMsgTitle.Text = "Note Utilisateur"
+$lblMsgTitle.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$lblMsgTitle.ForeColor = $cTextSecondary
+$lblMsgTitle.Location = New-Object Drawing.Point(15, 6)
+$lblMsgTitle.AutoSize = $true
+
+$rtbMsg = New-Object Windows.Forms.RichTextBox
+$rtbMsg.Location = New-Object Drawing.Point(15, 26)
+$rtbMsg.Size = New-Object Drawing.Size(290, 102)
+$rtbMsg.BackColor = $cSurface
+$rtbMsg.ForeColor = $cTextPrimary
+$rtbMsg.Font = [Drawing.Font]::new("Segoe UI", 9)
+$rtbMsg.ReadOnly = $true
+$rtbMsg.BorderStyle = 'None'
+$rtbMsg.Text = Get-MessageDemandeurText
+$rtbMsg.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+
+$btnCopyMsg = New-Object Windows.Forms.Button
+$btnCopyMsg.Text = "Copier"
+$btnCopyMsg.Location = New-Object Drawing.Point(315, 26)
+$btnCopyMsg.Size = New-Object Drawing.Size(85, 102)
+$btnCopyMsg.FlatStyle = 'Flat'
+$btnCopyMsg.FlatAppearance.BorderSize = 0
+$btnCopyMsg.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
+$btnCopyMsg.BackColor = $cAccentViolet
+$btnCopyMsg.ForeColor = $cWhite
+$btnCopyMsg.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$btnCopyMsg.Cursor = [Windows.Forms.Cursors]::Hand
+$btnCopyMsg.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$btnCopyMsg.Add_Click({
+    [System.Windows.Forms.Clipboard]::SetText($rtbMsg.Text)
+    $this.Text = "Copié !"
+    $this.BackColor = [Drawing.Color]::FromArgb(39, 174, 96)
+    $t = New-Object Windows.Forms.Timer
+    $t.Interval = 800; $t.Tag = $this
+    $t.Add_Tick({
+        $btn = $this.Tag
+        $btn.Text = "Copier"
+        $btn.BackColor = [Drawing.Color]::FromArgb(155, 89, 182)
+        $this.Stop(); $this.Dispose()
+    })
+    $t.Start()
+})
+
+$panelMsg.Controls.AddRange(@($lblMsgTitle, $rtbMsg, $btnCopyMsg))
+
+# Répartit la largeur disponible entre les deux notes (responsive côte à côte).
+# La Note ServiceNow (gauche) est un peu plus large que la Note Utilisateur (droite).
+function Layout-CopyPanels {
+    $totalW = $form.ClientSize.Width - 40
+    if ($totalW -lt 200) { return }
+    $gap = 15
+    $leftW = [int](($totalW - $gap) * 0.595)
+    $panelCopy.Left = 20
+    $panelCopy.Width = $leftW
+    $panelMsg.Left = 20 + $leftW + $gap
+    $panelMsg.Width = $totalW - $gap - $leftW
+}
+$form.Add_Resize({ Layout-CopyPanels })
+Layout-CopyPanels
 
 # --- Aperçu du sujet ---
 $lblSubjectLabel = New-Object Windows.Forms.Label
@@ -1061,7 +1150,47 @@ $webBrowser.Dock = 'Fill'
 $webBrowser.ScriptErrorsSuppressed = $true
 $panelPreview.Controls.Add($webBrowser)
 
-# --- Bouton repli/dépli du bas (objet + aperçu + note ServiceNow) ---
+# --- Bouton « Copier tout » visible uniquement quand l'aperçu est masqué ---
+# Les deux notes étant cachées en mode replié, ce bouton permet de copier
+# d'un clic la Note ServiceNow + la Note Utilisateur.
+$btnCopyCollapsed = New-Object Windows.Forms.Button
+$btnCopyCollapsed.Text = "📋  Copier tout (Note ServiceNow + Note Utilisateur)"
+$btnCopyCollapsed.Location = New-Object Drawing.Point(20, 288)
+$btnCopyCollapsed.Size = New-Object Drawing.Size(1045, 36)
+$btnCopyCollapsed.FlatStyle = 'Flat'
+$btnCopyCollapsed.FlatAppearance.BorderSize = 0
+$btnCopyCollapsed.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
+$btnCopyCollapsed.BackColor = $cAccentViolet
+$btnCopyCollapsed.ForeColor = $cWhite
+$btnCopyCollapsed.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+$btnCopyCollapsed.Cursor = [Windows.Forms.Cursors]::Hand
+$btnCopyCollapsed.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
+$btnCopyCollapsed.Visible = $false
+$btnCopyCollapsed.Add_Click({
+    # Les deux notes sont copiées comme deux parties distinctes (en-têtes + séparation).
+    $tout = @(
+        "----- Note ServiceNow -----",
+        (Get-CopyBlockText),
+        "",
+        "----- Note Utilisateur -----",
+        (Get-MessageDemandeurText)
+    ) -join "`r`n"
+    [System.Windows.Forms.Clipboard]::SetText($tout)
+    $this.Text = "Copié !"
+    $this.BackColor = [Drawing.Color]::FromArgb(39, 174, 96)
+    $t = New-Object Windows.Forms.Timer
+    $t.Interval = 900; $t.Tag = $this
+    $t.Add_Tick({
+        $btn = $this.Tag
+        $btn.Text = "📋  Copier tout (Note ServiceNow + Note Utilisateur)"
+        $btn.BackColor = [Drawing.Color]::FromArgb(155, 89, 182)
+        $this.Stop(); $this.Dispose()
+    })
+    $t.Start()
+})
+$form.Controls.Add($btnCopyCollapsed)
+
+# --- Bouton repli/dépli du bas (objet + aperçu + notes) ---
 # Gagne de la place sur les petits écrans : un clic masque tout le bas et réduit
 # la hauteur de la fenêtre ; re-clic restaure.
 $global:PreviewCollapsed = $false
@@ -1082,14 +1211,16 @@ $btnTogglePreview.Add_Click({
     $global:PreviewCollapsed = -not $global:PreviewCollapsed
     $vis = -not $global:PreviewCollapsed
     $panelCopy.Visible = $vis
+    $panelMsg.Visible = $vis
     $lblSubjectLabel.Visible = $vis
     $txtSubjectPreview.Visible = $vis
     $lblPreviewLabel.Visible = $vis
     $panelPreview.Visible = $vis
+    $btnCopyCollapsed.Visible = $global:PreviewCollapsed
     if ($global:PreviewCollapsed) {
         $btnTogglePreview.Text = "▶ Aperçu"
-        $form.MinimumSize = New-Object Drawing.Size(1095, 300)
-        $form.Height = 332
+        $form.MinimumSize = New-Object Drawing.Size(1095, 348)
+        $form.Height = 380
     } else {
         $btnTogglePreview.Text = "▼ Aperçu"
         $form.Height = 920
@@ -1112,6 +1243,7 @@ function Update-Preview {
         $txtSubjectPreview.Text = $objet
         $html = Get-CorpsMessageHTML_Preview $objet $nomPrenom $cheminHeader $cheminSignature
     }
+    $rtbMsg.Text = Get-MessageDemandeurText
     $webBrowser.DocumentText = $html
 }
 
@@ -1241,6 +1373,8 @@ $global:BubbleLastPos = $null
 $global:BubbleNextPos = $null
 $global:BubbleSide = 'Right'
 $global:AppFullBounds = $null
+# Capture de la fenêtre (image source du fantôme animé).
+$global:GhostSrc = $null
 
 # Bouton « masquer » dans l'en-tête (à gauche du bouton « ? »).
 $btnHide = New-Object Windows.Forms.Button
@@ -1333,23 +1467,81 @@ $picBubble.Add_MouseUp({
 })
 
 # ============================================================================
-#  Animation « trou noir » : au masquage, une IMAGE FANTÔME de l'app est aspirée
-#  (rétrécit + s'estompe) vers le centre de la BULLE ; à l'affichage, elle ré-émerge
-#  de la bulle en grandissant. Le point focal est la bulle (pas le bord d'écran),
-#  ce qui supprime tout calcul de bord et tout débordement multi-écran. Le vrai
-#  formulaire n'est jamais redimensionné (pas de jank de layout) : on anime un
-#  fantôme = capture d'écran de la fenêtre.
+#  Animation « vortex / trou noir » (façon Kamui) : au masquage, une IMAGE FANTÔME
+#  de l'app TOURNE sur elle-même, SPIRALE et s'aspire vers la bulle en accélérant ;
+#  à l'affichage, elle ré-émerge de la bulle (tourne à l'envers + grandit). Point
+#  focal = la bulle (pas le bord d'écran) => robuste multi-écran ; le vrai formulaire
+#  n'est jamais redimensionné. On anime un fantôme (capture d'écran) qui tourne,
+#  SPIRALE, devient progressivement FLOU + ARRONDI + transparent (doux pour les yeux),
+#  via une fenêtre à transparence PAR PIXEL (UpdateLayeredWindow).
 # ============================================================================
+# Fenêtre à transparence PAR PIXEL (alpha doux, pas de bord net) via UpdateLayeredWindow.
+Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
+using System;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+public static class LayeredGhost {
+    [DllImport("user32.dll", SetLastError=true)] static extern int GetWindowLong(IntPtr h, int i);
+    [DllImport("user32.dll", SetLastError=true)] static extern int SetWindowLong(IntPtr h, int i, int v);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr o);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
+    [DllImport("user32.dll", SetLastError=true)]
+    static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr dst, ref POINT pDst, ref SIZE size, IntPtr src, ref POINT pSrc, int key, ref BLENDFUNCTION bf, int flags);
+    [StructLayout(LayoutKind.Sequential)] struct POINT { public int x, y; public POINT(int a, int b){x=a;y=b;} }
+    [StructLayout(LayoutKind.Sequential)] struct SIZE { public int cx, cy; public SIZE(int a, int b){cx=a;cy=b;} }
+    [StructLayout(LayoutKind.Sequential, Pack=1)] struct BLENDFUNCTION { public byte Op, Flags, Alpha, Format; }
+    const int GWL_EXSTYLE=-20, WS_EX_LAYERED=0x80000, ULW_ALPHA=2;
+    public static void Enable(IntPtr hwnd) {
+        int ex = GetWindowLong(hwnd, GWL_EXSTYLE);
+        SetWindowLong(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+    }
+    static void Premultiply(Bitmap bmp) {
+        Rectangle r = new Rectangle(0,0,bmp.Width,bmp.Height);
+        BitmapData d = bmp.LockBits(r, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+        byte[] buf = new byte[d.Stride*d.Height];
+        Marshal.Copy(d.Scan0, buf, 0, buf.Length);
+        for (int i=0;i<buf.Length;i+=4){
+            int a=buf[i+3];
+            buf[i]=(byte)(buf[i]*a/255); buf[i+1]=(byte)(buf[i+1]*a/255); buf[i+2]=(byte)(buf[i+2]*a/255);
+        }
+        Marshal.Copy(buf,0,d.Scan0,buf.Length);
+        bmp.UnlockBits(d);
+    }
+    public static void Update(IntPtr hwnd, Bitmap bmp, int x, int y, byte alpha) {
+        Premultiply(bmp);
+        IntPtr screen = GetDC(IntPtr.Zero);
+        IntPtr mem = CreateCompatibleDC(screen);
+        IntPtr hb = IntPtr.Zero, old = IntPtr.Zero;
+        try {
+            hb = bmp.GetHbitmap(Color.FromArgb(0));
+            old = SelectObject(mem, hb);
+            SIZE sz = new SIZE(bmp.Width, bmp.Height);
+            POINT ps = new POINT(0,0); POINT pd = new POINT(x,y);
+            BLENDFUNCTION bf = new BLENDFUNCTION(); bf.Op=0; bf.Flags=0; bf.Alpha=alpha; bf.Format=1;
+            UpdateLayeredWindow(hwnd, screen, ref pd, ref sz, mem, ref ps, 0, ref bf, ULW_ALPHA);
+        } finally {
+            if (old != IntPtr.Zero) SelectObject(mem, old);
+            if (hb != IntPtr.Zero) DeleteObject(hb);
+            DeleteDC(mem); ReleaseDC(IntPtr.Zero, screen);
+        }
+    }
+}
+"@
+
 $ghost = New-Object Windows.Forms.Form
 $ghost.FormBorderStyle = 'None'; $ghost.ShowInTaskbar = $false
 $ghost.StartPosition = 'Manual'; $ghost.TopMost = $true
 $ghost.MinimumSize = New-Object Drawing.Size(1, 1)
 $ghost.AutoScaleMode = 'None'
-$picGhost = New-Object Windows.Forms.PictureBox
-$picGhost.Dock = 'Fill'; $picGhost.SizeMode = 'StretchImage'
-$ghost.Controls.Add($picGhost)
+$null = $ghost.Handle                       # force la création du handle
+[LayeredGhost]::Enable($ghost.Handle)       # active la transparence par pixel
 
-# Capture pixel-fidèle de la fenêtre (inclut le WebBrowser d'aperçu) dans le fantôme.
+# Capture pixel-fidèle de la fenêtre (inclut le WebBrowser d'aperçu) -> $global:GhostSrc.
 function Capture-FormToGhost {
     try {
         $b = $form.Bounds
@@ -1357,40 +1549,91 @@ function Capture-FormToGhost {
         $g = [Drawing.Graphics]::FromImage($bmp)
         $g.CopyFromScreen($b.X, $b.Y, 0, 0, $b.Size)
         $g.Dispose()
-        $old = $picGhost.Image; $picGhost.Image = $bmp; if ($old) { $old.Dispose() }
-    } catch { }
+        $old = $global:GhostSrc; $global:GhostSrc = $bmp; if ($old) { $old.Dispose() }
+    } catch { $global:GhostSrc = $null }
 }
 
-# Interpolation linéaire de rectangles (t dans [0,1]).
-function Get-LerpRect($a, $b, $t) {
-    $x = [int]($a.X + ($b.X - $a.X) * $t)
-    $y = [int]($a.Y + ($b.Y - $a.Y) * $t)
-    $w = [Math]::Max(1, [int]($a.Width + ($b.Width - $a.Width) * $t))
-    $h = [Math]::Max(1, [int]($a.Height + ($b.Height - $a.Height) * $t))
-    return New-Object Drawing.Rectangle($x, $y, $w, $h)
+# Rend une frame « Kamui » (ARGB) : image pivotée de $Ang°, masquée en rectangle ARRONDI
+# (rayon ramené par $RoundFrac : 0=rect, 1=ellipse) puis FLOUTÉE (facteur $BlurF >= 1).
+# Renvoie @{ Bmp; W; H }. Le FONDU global est appliqué à part (alpha de la fenêtre).
+function Render-Kamui($Src, $Dw, $Dh, $Ang, $BlurF, $RoundFrac) {
+    $rad = $Ang * [Math]::PI / 180.0
+    $c = [Math]::Abs([Math]::Cos($rad)); $s = [Math]::Abs([Math]::Sin($rad))
+    $pad = 26
+    $bw = [int][Math]::Ceiling($Dw * $c + $Dh * $s) + 2 * $pad; if ($bw -lt 1) { $bw = 1 }
+    $bh = [int][Math]::Ceiling($Dw * $s + $Dh * $c) + 2 * $pad; if ($bh -lt 1) { $bh = 1 }
+    $canvas = New-Object Drawing.Bitmap($bw, $bh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [Drawing.Graphics]::FromImage($canvas)
+    $g.SmoothingMode = 'AntiAlias'; $g.InterpolationMode = 'HighQualityBilinear'
+    $g.TranslateTransform($bw / 2.0, $bh / 2.0); $g.RotateTransform([single]$Ang)
+    $rr = [Math]::Min($Dw, $Dh) / 2.0 * $RoundFrac
+    if ($rr -lt 0.5) {
+        $g.SetClip((New-Object Drawing.RectangleF([single](-$Dw / 2.0), [single](-$Dh / 2.0), [single]$Dw, [single]$Dh)))
+    } else {
+        $d = 2.0 * $rr; $pp = New-Object Drawing.Drawing2D.GraphicsPath
+        $pp.AddArc([single](-$Dw / 2.0), [single](-$Dh / 2.0), [single]$d, [single]$d, 180, 90)
+        $pp.AddArc([single]($Dw / 2.0 - $d), [single](-$Dh / 2.0), [single]$d, [single]$d, 270, 90)
+        $pp.AddArc([single]($Dw / 2.0 - $d), [single]($Dh / 2.0 - $d), [single]$d, [single]$d, 0, 90)
+        $pp.AddArc([single](-$Dw / 2.0), [single]($Dh / 2.0 - $d), [single]$d, [single]$d, 90, 90)
+        $pp.CloseFigure(); $g.SetClip($pp); $pp.Dispose()
+    }
+    $g.DrawImage($Src, (New-Object Drawing.Rectangle([int](-$Dw / 2), [int](-$Dh / 2), [int]$Dw, [int]$Dh)))
+    $g.ResetClip(); $g.Dispose()
+    if ($BlurF -gt 1.05) {
+        $hw = [Math]::Max(1, [int]($bw / $BlurF)); $hh = [Math]::Max(1, [int]($bh / $BlurF))
+        $tmp = New-Object Drawing.Bitmap($hw, $hh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $ga = [Drawing.Graphics]::FromImage($tmp); $ga.InterpolationMode = 'HighQualityBilinear'; $ga.DrawImage($canvas, 0, 0, $hw, $hh); $ga.Dispose()
+        $out = New-Object Drawing.Bitmap($bw, $bh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $gb = [Drawing.Graphics]::FromImage($out); $gb.InterpolationMode = 'HighQualityBilinear'; $gb.DrawImage($tmp, 0, 0, $bw, $bh); $gb.Dispose()
+        $canvas.Dispose(); $tmp.Dispose(); $canvas = $out
+    }
+    return @{ Bmp = $canvas; W = $bw; H = $bh }
 }
 
-# Petit rectangle « trou noir » centré sur la bulle (point d'aspiration / d'émergence).
-function Get-BlackHoleRect($BubblePos, $Bw, $Bh) {
-    $cx = $BubblePos.X + [int]($Bw / 2); $cy = $BubblePos.Y + [int]($Bh / 2)
-    return New-Object Drawing.Rectangle(($cx - 8), ($cy - 8), 16, 16)
+# Compose + affiche une frame centrée sur ($Cx,$Cy), avec fondu $Alpha (0-255).
+function Set-GhostFrame($Cx, $Cy, $Dw, $Dh, $Ang, $BlurF, $RoundFrac, $Alpha) {
+    $r = Render-Kamui $global:GhostSrc $Dw $Dh $Ang $BlurF $RoundFrac
+    $x = [int]($Cx - $r.W / 2.0); $y = [int]($Cy - $r.H / 2.0)
+    $a = [int]$Alpha; if ($a -lt 0) { $a = 0 } elseif ($a -gt 255) { $a = 255 }
+    [LayeredGhost]::Update($ghost.Handle, $r.Bmp, $x, $y, [byte]$a)
+    $r.Bmp.Dispose()
 }
 
 $slideTimer = New-Object Windows.Forms.Timer
-$slideTimer.Interval = 11
-$slideState = @{ Frame = 0; Total = 15; Hiding = $false; FromRect = $null; ToRect = $null }
+$slideTimer.Interval = 10
+$slideState = @{ Frame = 0; Total = 16; Hiding = $false
+    AppCx = 0.0; AppCy = 0.0; BubCx = 0.0; BubCy = 0.0; W0 = 1; H0 = 1; Spins = 1.5; R0 = 120.0 }
 $slideTimer.Add_Tick({
     $slideState.Frame++
     $t = $slideState.Frame / $slideState.Total
     if ($t -gt 1) { $t = 1 }
     if ($slideState.Hiding) {
-        $e = $t * $t                          # aspiration : accélère vers la bulle
-        $ghost.Opacity = 1.0 - 0.65 * $t
+        $p = [Math]::Pow($t, 1.9)                       # aspiration : retient puis happe
     } else {
-        $e = 1 - (1 - $t) * (1 - $t)          # émergence : décélère en arrivant
-        $ghost.Opacity = 0.35 + 0.65 * $t
+        $p = 1.0 - [Math]::Pow(1 - $t, 1.9)             # émergence : jaillit puis se pose
     }
-    $ghost.Bounds = Get-LerpRect $slideState.FromRect $slideState.ToRect $e
+    # 'a' = progression « avancée dans le trou » (0 = pleine app nette, 1 = happée/floue).
+    $a = if ($slideState.Hiding) { $p } else { 1.0 - $p }
+    # Angle de la SPIRALE (trajectoire uniquement) : l'app NE TOURNE PAS sur elle-même.
+    $pathAng = $slideState.Spins * 360.0 * $a
+    $scale = 1.0 - 0.96 * $a
+    $blurF = 1.0 + 9.0 * [Math]::Pow($a, 1.3)
+    $round = [Math]::Min(1.0, $a * 1.4)
+    $alpha = 255.0 * (1.0 - 0.88 * $a)
+    if ($slideState.Hiding) {
+        $cx0 = $slideState.AppCx + ($slideState.BubCx - $slideState.AppCx) * $p
+        $cy0 = $slideState.AppCy + ($slideState.BubCy - $slideState.AppCy) * $p
+    } else {
+        $cx0 = $slideState.BubCx + ($slideState.AppCx - $slideState.BubCx) * $p
+        $cy0 = $slideState.BubCy + ($slideState.AppCy - $slideState.BubCy) * $p
+    }
+    # Décalage en SPIRALE : rayon nul aux extrémités, maximal au milieu (trajectoire courbe).
+    $sr = $slideState.R0 * [Math]::Sin([Math]::PI * $p)
+    $rad = $pathAng * [Math]::PI / 180.0
+    $cx = $cx0 + $sr * [Math]::Cos($rad)
+    $cy = $cy0 + $sr * [Math]::Sin($rad)
+    # Angle de rotation de l'image = 0 : l'app reste droite (pas de spin).
+    Set-GhostFrame $cx $cy ([Math]::Max(1, $slideState.W0 * $scale)) ([Math]::Max(1, $slideState.H0 * $scale)) 0 $blurF $round $alpha
     if ($slideState.Frame -ge $slideState.Total) {
         $slideTimer.Stop()
         if ($slideState.Hiding) {
@@ -1424,30 +1667,43 @@ function Hide-App {
         $pos = New-Object Drawing.Point(($wa.Right - $bw - 8), [int]($wa.Top + ($wa.Height - $bh) / 2))
     }
     $global:BubbleNextPos = $pos
-    # Capture l'app, montre le fantôme à taille pleine (identique => sans rupture),
-    # puis cache le vrai formulaire. L'animation l'aspire ensuite vers la bulle.
     $global:AppFullBounds = $form.Bounds
     Capture-FormToGhost
-    $slideState.FromRect = $global:AppFullBounds
-    $slideState.ToRect = Get-BlackHoleRect $pos $bw $bh
+    $fb = $global:AppFullBounds
+    if ($null -eq $global:GhostSrc) {
+        # Repli si la capture a échoué : masquage direct sans animation.
+        $global:AppHidden = $true; $form.Hide()
+        $bubble.Location = $pos; $global:BubbleLastPos = $pos
+        $bubble.TopMost = $true; $bubble.Show(); $bubble.BringToFront(); return
+    }
+    $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
+    $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
+    $slideState.BubCx = $pos.X + $bw / 2.0; $slideState.BubCy = $pos.Y + $bh / 2.0
     $slideState.Frame = 0; $slideState.Hiding = $true
-    $ghost.Bounds = $global:AppFullBounds
-    $ghost.Opacity = 1.0
-    $ghost.Show(); $ghost.BringToFront()
+    # Frame 0 = image pleine, nette, non pivotée => relais sans rupture avec la fenêtre.
+    [LayeredGhost]::Enable($ghost.Handle)
+    Set-GhostFrame $slideState.AppCx $slideState.AppCy $fb.Width $fb.Height 0 1.0 0.0 255
+    $ghost.Visible = $true; $ghost.BringToFront()
     $form.Hide()
     $slideTimer.Start()
 }
 function Show-App {
     if (-not $global:AppHidden -or $slideTimer.Enabled) { return }
-    # Le fantôme ré-émerge de la bulle (petit) vers les bounds d'origine de l'app.
-    $start = Get-BlackHoleRect $bubble.Location $bubble.Width $bubble.Height
-    $bubble.Hide()
-    $slideState.FromRect = $start
-    $slideState.ToRect = $global:AppFullBounds
+    if ($null -eq $global:GhostSrc -or $null -eq $global:AppFullBounds) {
+        # Repli : affichage direct.
+        $bubble.Hide(); if ($global:AppFullBounds) { $form.Bounds = $global:AppFullBounds }
+        $form.Show(); $form.Activate(); $global:AppHidden = $false; return
+    }
+    $fb = $global:AppFullBounds
+    $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
+    $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
+    $slideState.BubCx = $bubble.Left + $bubble.Width / 2.0; $slideState.BubCy = $bubble.Top + $bubble.Height / 2.0
     $slideState.Frame = 0; $slideState.Hiding = $false
-    $ghost.Bounds = $start
-    $ghost.Opacity = 0.35
-    $ghost.Show(); $ghost.BringToFront()
+    # Frame 0 = tout petit, flou, transparent (sans rotation), au centre de la bulle.
+    [LayeredGhost]::Enable($ghost.Handle)
+    Set-GhostFrame $slideState.BubCx $slideState.BubCy ([Math]::Max(1, $fb.Width * 0.04)) ([Math]::Max(1, $fb.Height * 0.04)) 0 10.0 1.0 30
+    $bubble.Hide()
+    $ghost.Visible = $true; $ghost.BringToFront()
     $slideTimer.Start()
 }
 
