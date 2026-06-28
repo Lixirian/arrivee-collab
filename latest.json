@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.4.2",
-    "zip":  "Arrivee-Collab_version1.4.2.zip",
+    "version":  "1.4.3",
+    "zip":  "Arrivee-Collab_version1.4.3.zip",
     "notes":  [
-                  "Correctif « Copier tout » : les deux notes arrivent désormais bien dans l\u0027historique du presse-papiers (Win+V). La copie de la note ServiceNow est légèrement différée pour que Windows enregistre aussi la note Utilisateur."
+                  "L\u0027historique du presse-papiers (Win+V) est activé automatiquement au démarrage s\u0027il ne l\u0027était pas, pour que « Copier tout » fonctionne sans réglage manuel (sauf si bloqué par une stratégie d\u0027entreprise)."
               ]
 }

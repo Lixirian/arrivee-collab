@@ -109,6 +109,10 @@ $workDir = Get-AppWorkDir $dataDir
 Initialize-AppLog (Join-Path $dataDir 'app_debug.log')
 Write-AppLog "[INIT] App : $baseDir | Données : $dataDir"
 
+# Active l'historique du presse-papiers (Win+V) s'il est désactivé : indispensable
+# pour que le bouton « Copier tout » y place les deux notes. Best-effort, non bloquant.
+[void](Enable-ClipboardHistory)
+
 # Contexte global partagé (étendu par le Plan B : pastille MAJ, tutoriel).
 $global:Ctx = @{
     Config          = $Config
