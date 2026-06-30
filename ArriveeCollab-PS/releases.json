@@ -1,4 +1,9 @@
 ﻿{
+    "1.5.0": [
+        "Masquage automatique : dès que vous basculez vers une autre application, l'outil se replie tout seul dans la bulle pour rester visible. Cliquez la bulle pour le ramener.",
+        "L'app reste affichée pendant toute la génération du .msg (y compris son ouverture dans Outlook), le temps de finir vos actions.",
+        "Tutoriel enrichi (14 étapes) présentant le masquage automatique."
+    ],
     "1.4.3": [
         "L'historique du presse-papiers (Win+V) est activé automatiquement au démarrage s'il ne l'était pas, pour que « Copier tout » fonctionne sans réglage manuel (sauf si bloqué par une stratégie d'entreprise)."
     ],
