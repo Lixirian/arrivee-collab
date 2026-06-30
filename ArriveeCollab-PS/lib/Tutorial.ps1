@@ -1,13 +1,13 @@
 ﻿# ============================================================================
 #  Tutoriel interactif : au PREMIER lancement (et re-jouable via le bouton « ? »),
-#  présente l'outil en 13 étapes. Chaque étape met en évidence le vrai contrôle
+#  présente l'outil en 14 étapes. Chaque étape met en évidence le vrai contrôle
 #  (cadre violet) avec une carte d'explication à côté. Rendu WinForms (Task 2).
 # ============================================================================
 
 # Version du CONTENU du tutoriel. À INCRÉMENTER à chaque modification de
 # Get-TutorialSteps : un utilisateur ayant vu une version plus ancienne le revoit
 # une fois au lancement (bouton « Passer » disponible).
-$script:TutorialVersion = 4
+$script:TutorialVersion = 5
 
 # Étapes data-driven. Icon = caractère (ConvertFromUtf32, robuste à l'encodage).
 # Target = scriptblock renvoyant le contrôle à encadrer (ou $null pour une carte centrée).
@@ -49,6 +49,9 @@ function Get-TutorialSteps {
            Target = { $btnReset } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4AC)); Title = "Masquer l'application"
            Text  = "Ce bouton aspire la fenêtre dans une petite bulle ronde posée sur le bord de l'écran. Cliquez la bulle pour faire réapparaître l'app, glissez-la pour la déplacer (elle s'aimante au bord gauche ou droit), ou clic droit pour fermer l'outil."
+           Target = { $btnHide } }
+        @{ Icon = ([char]::ConvertFromUtf32(0x1F9F2)); Title = 'Masquage automatique'
+           Text  = "Plus besoin de cliquer : dès que vous basculez vers une autre application, l'outil se replie tout seul dans cette bulle pour rester visible sans vous gêner. Cliquez la bulle pour le ramener. Pendant la création du .msg (et son ouverture dans Outlook), l'app reste affichée pour vous laisser terminer."
            Target = { $btnHide } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F389)); Title = "C'est parti !"
            Text  = "Vous êtes prêt. Les mises à jour de l'outil vous présenteront automatiquement les nouveautés. Vous pouvez rejouer ce tutoriel à tout moment via le bouton « ? » en haut à droite."
