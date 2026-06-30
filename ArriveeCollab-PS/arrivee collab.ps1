@@ -1374,6 +1374,8 @@ $form.Add_Shown({
 #  n'apparaît QUE pendant le masquage. Tout est recalculé au clic (correct multi-écran).
 # ============================================================================
 $global:AppHidden = $false
+# Drapeau : suspend le masquage automatique pendant le flux de génération du .msg.
+$global:SuppressAutoHide = $false
 # Dernière position de la bulle ($null = jamais déplacée => position par défaut).
 $global:BubbleLastPos = $null
 # Position d'apparition résolue au masquage + bounds pleins de l'app (pour l'animation).
@@ -1539,6 +1541,14 @@ public static class LayeredGhost {
     }
 }
 "@
+
+# P/Invoke : fenêtre au premier plan + son PID (pour le masquage automatique).
+Add-Type -Namespace Win32 -Name Fg -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern System.IntPtr GetForegroundWindow();
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint lpdwProcessId);
+'@
 
 $ghost = New-Object Windows.Forms.Form
 $ghost.FormBorderStyle = 'None'; $ghost.ShowInTaskbar = $false
@@ -1715,6 +1725,29 @@ function Show-App {
 }
 
 $btnHide.Add_Click({ Hide-App })
+
+# ============================================================================
+#  Masquage AUTOMATIQUE : quand l'app perd le focus vers une AUTRE application,
+#  elle se replie en bulle (même animation que le bouton « masquer »). Un timer
+#  mono-coup de 200 ms laisse le nouveau premier plan se stabiliser ; on ne
+#  masque que si sa fenêtre appartient à un autre processus (cf. Should-AutoHide,
+#  lib/Common.ps1). Couvre ainsi dialogues, popup calendrier, tutoriel, bulle.
+# ============================================================================
+$timerAutoHide = New-Object Windows.Forms.Timer
+$timerAutoHide.Interval = 200
+$timerAutoHide.Add_Tick({
+    $timerAutoHide.Stop()
+    $h = [Win32.Fg]::GetForegroundWindow()
+    $fgPid = [uint32]0
+    if ($h -ne [IntPtr]::Zero) { [void][Win32.Fg]::GetWindowThreadProcessId($h, [ref]$fgPid) }
+    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID) {
+        Hide-App
+    }
+}.GetNewClosure())
+$form.Add_Deactivate({
+    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide) { return }
+    $timerAutoHide.Stop(); $timerAutoHide.Start()
+}.GetNewClosure())
 # (le clic simple sur la bulle est géré par MouseUp ci-dessus : tap = afficher, glisser = déplacer)
 
 # Clic-DROIT sur la bulle : menu pour afficher ou fermer l'app même en mode masqué
