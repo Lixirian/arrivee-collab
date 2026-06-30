@@ -1268,6 +1268,11 @@ $btnGenPwd.Add_Click({
 })
 
 $btnGenMsg.Add_Click({
+    # Pendant toute la génération (création du .msg, ouverture dans Outlook,
+    # dialogues, saisie bénéficiaire), on suspend le masquage automatique :
+    # l'utilisateur a encore des actions sur l'app après l'ouverture du message.
+    $global:SuppressAutoHide = $true
+    try {
     $ritm = $txtRITM.Text.Trim(); $nomPrenom = $txtNomPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
     if ($ritm -eq "" -or $nomPrenom -eq "" -or $dest -eq "") {
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
@@ -1336,6 +1341,9 @@ $btnGenMsg.Add_Click({
             if ($benef.OU) { $global:CopyOU = ($benef.OU -replace '\s+', '/') -replace '/+', '/' }
             $rtbCopy.Text = Get-CopyBlockText
         }
+    }
+    } finally {
+        $global:SuppressAutoHide = $false
     }
 })
 
