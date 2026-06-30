@@ -105,6 +105,14 @@ Assert (Test-TutorialDue @{ TutorialSeenVersion = 0 } 1) 'tuto : jamais vu -> af
 Assert (-not (Test-TutorialDue @{ TutorialSeenVersion = 1 } 1)) 'tuto : deja vu version courante -> pas affiche'
 Assert (Test-TutorialDue @{ TutorialSeenVersion = 1 } 2) 'tuto : contenu plus recent -> reaffiche'
 
+# --- Should-AutoHide (décision de masquage auto) ---
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $true)  'autohide : autre processus => masquer'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 1234 -OwnPid 1234) -eq $false) 'autohide : meme processus (dialogue/calendrier) => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $true  -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : flux .msg supprime => non'
+Assert ((Should-AutoHide -AppHidden $true  -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : deja masquee => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $true  -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : animation en cours => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 0    -OwnPid 1234) -eq $false) 'autohide : pas de fenetre premier plan => non'
+
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TOUS LES TESTS PASSENT" -ForegroundColor Green }
 else { Write-Host "$($script:fail) ÉCHEC(S)" -ForegroundColor Red; exit 1 }
