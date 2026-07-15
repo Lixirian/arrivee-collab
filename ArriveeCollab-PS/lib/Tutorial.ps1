@@ -42,7 +42,7 @@ function Get-TutorialSteps {
            Text  = "Juste à droite, ce panneau affiche le message de clôture à transmettre au demandeur. Son texte s'adapte au mode (mot de passe envoyé ou déjà initialisé). Le bouton « Copier » le place dans le presse-papiers."
            Target = { $panelMsg } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F441)); Title = "Replier l'aperçu"
-           Text  = "Ce bouton replie l'objet, l'aperçu du message et les deux notes pour réduire la fenêtre — pratique sur un petit écran de portable. Une fois replié, un bouton « Copier tout » apparaît pour copier d'un coup la note ServiceNow et la note Utilisateur. Recliquez pour tout réafficher."
+           Text  = "Ce bouton replie l'objet, l'aperçu du message et les deux notes pour réduire la fenêtre — pratique sur un petit écran de portable. Une fois replié, un bouton « Copier tout » apparaît pour copier d'un coup la note ServiceNow et la note Utilisateur. Recliquez pour tout réafficher. Votre choix est mémorisé pour les prochains lancements."
            Target = { $btnTogglePreview } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F504)); Title = 'Réinitialiser'
            Text  = "Ce bouton vide tous les champs pour traiter une nouvelle arrivée sans relancer l'application."

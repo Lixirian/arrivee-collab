@@ -1,9 +1,8 @@
 ﻿{
-    "version":  "1.5.0",
-    "zip":  "Arrivee-Collab_version1.5.0.zip",
+    "version":  "1.5.1",
+    "zip":  "Arrivee-Collab_version1.5.1.zip",
     "notes":  [
-                  "Masquage automatique : dès que vous basculez vers une autre application, l\u0027outil se replie tout seul dans la bulle pour rester visible. Cliquez la bulle pour le ramener.",
-                  "L\u0027app reste affichée pendant toute la génération du .msg (y compris son ouverture dans Outlook), le temps de finir vos actions.",
-                  "Tutoriel enrichi (14 étapes) présentant le masquage automatique."
+                  "Animation de masquage plus fluide : l\u0027effet vortex (qui pouvait saccader) est remplacé par une simple apparition depuis la bulle et une rétractation vers la bulle.",
+                  "Le repli de l\u0027aperçu est mémorisé : si vous fermez l\u0027app avec l\u0027aperçu replié, elle se rouvre repliée au prochain lancement."
               ]
 }

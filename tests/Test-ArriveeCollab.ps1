@@ -21,8 +21,9 @@ $tmpState = Join-Path $env:TEMP ("ac_state_test_" + [guid]::NewGuid().ToString('
 try {
     $s = New-AppState $tmpState
     Assert ($s.Version -eq '' -and -not $s.TutorialSeen) 'state : état vierge par défaut'
+    Assert ($s.PreviewCollapsed -eq $false) 'state : PreviewCollapsed faux par défaut'
 
-    $s.Version = '1.0.0'; $s.TutorialSeen = $true; $s.TutorialSeenVersion = 2; $s.NotesShownVersion = '1.0.0'
+    $s.Version = '1.0.0'; $s.TutorialSeen = $true; $s.TutorialSeenVersion = 2; $s.NotesShownVersion = '1.0.0'; $s.PreviewCollapsed = $true
     Save-AppState $s
     Assert (Test-Path $tmpState) 'state : fichier écrit'
 
@@ -31,6 +32,7 @@ try {
     Assert ($s2.TutorialSeen -eq $true)     'state : TutorialSeen relu'
     Assert ($s2.TutorialSeenVersion -eq 2)  'state : TutorialSeenVersion relu'
     Assert ($s2.NotesShownVersion -eq '1.0.0') 'state : NotesShownVersion relue'
+    Assert ($s2.PreviewCollapsed -eq $true) 'state : PreviewCollapsed relu'
 
     $migrated = Invoke-AppVersionMigration $s2 '1.1.0'
     Assert ($migrated -eq $true)            'migration : montée détectée'

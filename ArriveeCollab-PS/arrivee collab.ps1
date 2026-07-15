@@ -1214,17 +1214,19 @@ $btnTogglePreview.ForeColor = $cTextPrimary
 $btnTogglePreview.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
 $btnTogglePreview.Cursor = [Windows.Forms.Cursors]::Hand
 $btnTogglePreview.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
-$btnTogglePreview.Add_Click({
-    $global:PreviewCollapsed = -not $global:PreviewCollapsed
-    $vis = -not $global:PreviewCollapsed
+# Applique l'état replié/déplié (visibilité + taille de fenêtre). Appelée par le
+# bouton et au démarrage pour restaurer la préférence persistée (state.json).
+function Set-PreviewCollapsed([bool]$Collapsed) {
+    $global:PreviewCollapsed = $Collapsed
+    $vis = -not $Collapsed
     $panelCopy.Visible = $vis
     $panelMsg.Visible = $vis
     $lblSubjectLabel.Visible = $vis
     $txtSubjectPreview.Visible = $vis
     $lblPreviewLabel.Visible = $vis
     $panelPreview.Visible = $vis
-    $btnCopyCollapsed.Visible = $global:PreviewCollapsed
-    if ($global:PreviewCollapsed) {
+    $btnCopyCollapsed.Visible = $Collapsed
+    if ($Collapsed) {
         $btnTogglePreview.Text = "▶ Aperçu"
         $form.MinimumSize = New-Object Drawing.Size(1095, 348)
         $form.Height = 380
@@ -1233,8 +1235,16 @@ $btnTogglePreview.Add_Click({
         $form.Height = 920
         $form.MinimumSize = New-Object Drawing.Size(1095, 650)
     }
+}
+$btnTogglePreview.Add_Click({
+    Set-PreviewCollapsed (-not $global:PreviewCollapsed)
+    # Mémorise la préférence pour les prochains lancements.
+    $global:Ctx.State.PreviewCollapsed = [bool]$global:PreviewCollapsed
+    try { Save-AppState $global:Ctx.State } catch { }
 })
 $panelActions.Controls.Add($btnTogglePreview)
+# Restaure la préférence « aperçu replié » du dernier lancement.
+if ($global:Ctx.State.PreviewCollapsed) { Set-PreviewCollapsed $true }
 
 # --- Logique de l'aperçu ---
 function Update-Preview {
@@ -1484,13 +1494,13 @@ $picBubble.Add_MouseUp({
 })
 
 # ============================================================================
-#  Animation « vortex / trou noir » (façon Kamui) : au masquage, une IMAGE FANTÔME
-#  de l'app TOURNE sur elle-même, SPIRALE et s'aspire vers la bulle en accélérant ;
-#  à l'affichage, elle ré-émerge de la bulle (tourne à l'envers + grandit). Point
-#  focal = la bulle (pas le bord d'écran) => robuste multi-écran ; le vrai formulaire
-#  n'est jamais redimensionné. On anime un fantôme (capture d'écran) qui tourne,
-#  SPIRALE, devient progressivement FLOU + ARRONDI + transparent (doux pour les yeux),
-#  via une fenêtre à transparence PAR PIXEL (UpdateLayeredWindow).
+#  Animation de masquage/affichage : au masquage, une IMAGE FANTÔME de l'app
+#  rétrécit en ligne droite vers la bulle en s'estompant ; à l'affichage, elle
+#  ré-émerge de la bulle et grandit jusqu'à sa position. Effet volontairement
+#  MINIMAL (zoom + fondu, sans rotation/spirale/flou : trop coûteux par frame,
+#  l'animation saccadait). Point focal = la bulle (pas le bord d'écran) =>
+#  robuste multi-écran ; le vrai formulaire n'est jamais redimensionné.
+#  Fenêtre à transparence PAR PIXEL (UpdateLayeredWindow).
 # ============================================================================
 # Fenêtre à transparence PAR PIXEL (alpha doux, pas de bord net) via UpdateLayeredWindow.
 Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
@@ -1517,20 +1527,10 @@ public static class LayeredGhost {
         int ex = GetWindowLong(hwnd, GWL_EXSTYLE);
         SetWindowLong(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
     }
-    static void Premultiply(Bitmap bmp) {
-        Rectangle r = new Rectangle(0,0,bmp.Width,bmp.Height);
-        BitmapData d = bmp.LockBits(r, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-        byte[] buf = new byte[d.Stride*d.Height];
-        Marshal.Copy(d.Scan0, buf, 0, buf.Length);
-        for (int i=0;i<buf.Length;i+=4){
-            int a=buf[i+3];
-            buf[i]=(byte)(buf[i]*a/255); buf[i+1]=(byte)(buf[i+1]*a/255); buf[i+2]=(byte)(buf[i+2]*a/255);
-        }
-        Marshal.Copy(buf,0,d.Scan0,buf.Length);
-        bmp.UnlockBits(d);
-    }
+    // NB : pas de prémultiplication alpha — les frames sont entièrement opaques
+    // (alpha par pixel = 255, où prémultiplié == direct) ; le fondu passe par
+    // BLENDFUNCTION.Alpha. Évite une boucle managée sur tous les pixels par frame.
     public static void Update(IntPtr hwnd, Bitmap bmp, int x, int y, byte alpha) {
-        Premultiply(bmp);
         IntPtr screen = GetDC(IntPtr.Zero);
         IntPtr mem = CreateCompatibleDC(screen);
         IntPtr hb = IntPtr.Zero, old = IntPtr.Zero;
@@ -1578,87 +1578,47 @@ function Capture-FormToGhost {
     } catch { $global:GhostSrc = $null }
 }
 
-# Rend une frame « Kamui » (ARGB) : image pivotée de $Ang°, masquée en rectangle ARRONDI
-# (rayon ramené par $RoundFrac : 0=rect, 1=ellipse) puis FLOUTÉE (facteur $BlurF >= 1).
-# Renvoie @{ Bmp; W; H }. Le FONDU global est appliqué à part (alpha de la fenêtre).
-function Render-Kamui($Src, $Dw, $Dh, $Ang, $BlurF, $RoundFrac) {
-    $rad = $Ang * [Math]::PI / 180.0
-    $c = [Math]::Abs([Math]::Cos($rad)); $s = [Math]::Abs([Math]::Sin($rad))
-    $pad = 26
-    $bw = [int][Math]::Ceiling($Dw * $c + $Dh * $s) + 2 * $pad; if ($bw -lt 1) { $bw = 1 }
-    $bh = [int][Math]::Ceiling($Dw * $s + $Dh * $c) + 2 * $pad; if ($bh -lt 1) { $bh = 1 }
-    $canvas = New-Object Drawing.Bitmap($bw, $bh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $g = [Drawing.Graphics]::FromImage($canvas)
-    $g.SmoothingMode = 'AntiAlias'; $g.InterpolationMode = 'HighQualityBilinear'
-    $g.TranslateTransform($bw / 2.0, $bh / 2.0); $g.RotateTransform([single]$Ang)
-    $rr = [Math]::Min($Dw, $Dh) / 2.0 * $RoundFrac
-    if ($rr -lt 0.5) {
-        $g.SetClip((New-Object Drawing.RectangleF([single](-$Dw / 2.0), [single](-$Dh / 2.0), [single]$Dw, [single]$Dh)))
-    } else {
-        $d = 2.0 * $rr; $pp = New-Object Drawing.Drawing2D.GraphicsPath
-        $pp.AddArc([single](-$Dw / 2.0), [single](-$Dh / 2.0), [single]$d, [single]$d, 180, 90)
-        $pp.AddArc([single]($Dw / 2.0 - $d), [single](-$Dh / 2.0), [single]$d, [single]$d, 270, 90)
-        $pp.AddArc([single]($Dw / 2.0 - $d), [single]($Dh / 2.0 - $d), [single]$d, [single]$d, 0, 90)
-        $pp.AddArc([single](-$Dw / 2.0), [single]($Dh / 2.0 - $d), [single]$d, [single]$d, 90, 90)
-        $pp.CloseFigure(); $g.SetClip($pp); $pp.Dispose()
-    }
-    $g.DrawImage($Src, (New-Object Drawing.Rectangle([int](-$Dw / 2), [int](-$Dh / 2), [int]$Dw, [int]$Dh)))
-    $g.ResetClip(); $g.Dispose()
-    if ($BlurF -gt 1.05) {
-        $hw = [Math]::Max(1, [int]($bw / $BlurF)); $hh = [Math]::Max(1, [int]($bh / $BlurF))
-        $tmp = New-Object Drawing.Bitmap($hw, $hh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        $ga = [Drawing.Graphics]::FromImage($tmp); $ga.InterpolationMode = 'HighQualityBilinear'; $ga.DrawImage($canvas, 0, 0, $hw, $hh); $ga.Dispose()
-        $out = New-Object Drawing.Bitmap($bw, $bh, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        $gb = [Drawing.Graphics]::FromImage($out); $gb.InterpolationMode = 'HighQualityBilinear'; $gb.DrawImage($tmp, 0, 0, $bw, $bh); $gb.Dispose()
-        $canvas.Dispose(); $tmp.Dispose(); $canvas = $out
-    }
-    return @{ Bmp = $canvas; W = $bw; H = $bh }
-}
-
-# Compose + affiche une frame centrée sur ($Cx,$Cy), avec fondu $Alpha (0-255).
-function Set-GhostFrame($Cx, $Cy, $Dw, $Dh, $Ang, $BlurF, $RoundFrac, $Alpha) {
-    $r = Render-Kamui $global:GhostSrc $Dw $Dh $Ang $BlurF $RoundFrac
-    $x = [int]($Cx - $r.W / 2.0); $y = [int]($Cy - $r.H / 2.0)
+# Compose + affiche une frame : capture de l'app redimensionnée ($Dw x $Dh),
+# centrée sur ($Cx,$Cy), avec fondu $Alpha (0-255). Un seul DrawImage bilinéaire
+# par frame pour rester fluide (le fondu passe par l'alpha de la fenêtre).
+function Set-GhostFrame($Cx, $Cy, $Dw, $Dh, $Alpha) {
+    $w = [int][Math]::Max(1, $Dw); $h = [int][Math]::Max(1, $Dh)
+    $bmp = New-Object Drawing.Bitmap($w, $h, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [Drawing.Graphics]::FromImage($bmp)
+    $g.InterpolationMode = 'Bilinear'
+    $g.DrawImage($global:GhostSrc, (New-Object Drawing.Rectangle(0, 0, $w, $h)))
+    $g.Dispose()
+    $x = [int]($Cx - $w / 2.0); $y = [int]($Cy - $h / 2.0)
     $a = [int]$Alpha; if ($a -lt 0) { $a = 0 } elseif ($a -gt 255) { $a = 255 }
-    [LayeredGhost]::Update($ghost.Handle, $r.Bmp, $x, $y, [byte]$a)
-    $r.Bmp.Dispose()
+    [LayeredGhost]::Update($ghost.Handle, $bmp, $x, $y, [byte]$a)
+    $bmp.Dispose()
 }
 
 $slideTimer = New-Object Windows.Forms.Timer
 $slideTimer.Interval = 10
-$slideState = @{ Frame = 0; Total = 16; Hiding = $false
-    AppCx = 0.0; AppCy = 0.0; BubCx = 0.0; BubCy = 0.0; W0 = 1; H0 = 1; Spins = 1.5; R0 = 120.0 }
+$slideState = @{ Frame = 0; Total = 14; Hiding = $false
+    AppCx = 0.0; AppCy = 0.0; BubCx = 0.0; BubCy = 0.0; W0 = 1; H0 = 1 }
 $slideTimer.Add_Tick({
     $slideState.Frame++
     $t = $slideState.Frame / $slideState.Total
     if ($t -gt 1) { $t = 1 }
     if ($slideState.Hiding) {
-        $p = [Math]::Pow($t, 1.9)                       # aspiration : retient puis happe
+        $p = [Math]::Pow($t, 1.9)                       # rétractation : retient puis happe
     } else {
-        $p = 1.0 - [Math]::Pow(1 - $t, 1.9)             # émergence : jaillit puis se pose
+        $p = 1.0 - [Math]::Pow(1 - $t, 1.9)             # apparition : jaillit puis se pose
     }
-    # 'a' = progression « avancée dans le trou » (0 = pleine app nette, 1 = happée/floue).
+    # 'a' = proximité de la bulle (0 = pleine app, 1 = réduite dans la bulle).
     $a = if ($slideState.Hiding) { $p } else { 1.0 - $p }
-    # Angle de la SPIRALE (trajectoire uniquement) : l'app NE TOURNE PAS sur elle-même.
-    $pathAng = $slideState.Spins * 360.0 * $a
     $scale = 1.0 - 0.96 * $a
-    $blurF = 1.0 + 9.0 * [Math]::Pow($a, 1.3)
-    $round = [Math]::Min(1.0, $a * 1.4)
-    $alpha = 255.0 * (1.0 - 0.88 * $a)
+    $alpha = 255.0 * (1.0 - 0.85 * $a)
     if ($slideState.Hiding) {
-        $cx0 = $slideState.AppCx + ($slideState.BubCx - $slideState.AppCx) * $p
-        $cy0 = $slideState.AppCy + ($slideState.BubCy - $slideState.AppCy) * $p
+        $cx = $slideState.AppCx + ($slideState.BubCx - $slideState.AppCx) * $p
+        $cy = $slideState.AppCy + ($slideState.BubCy - $slideState.AppCy) * $p
     } else {
-        $cx0 = $slideState.BubCx + ($slideState.AppCx - $slideState.BubCx) * $p
-        $cy0 = $slideState.BubCy + ($slideState.AppCy - $slideState.BubCy) * $p
+        $cx = $slideState.BubCx + ($slideState.AppCx - $slideState.BubCx) * $p
+        $cy = $slideState.BubCy + ($slideState.AppCy - $slideState.BubCy) * $p
     }
-    # Décalage en SPIRALE : rayon nul aux extrémités, maximal au milieu (trajectoire courbe).
-    $sr = $slideState.R0 * [Math]::Sin([Math]::PI * $p)
-    $rad = $pathAng * [Math]::PI / 180.0
-    $cx = $cx0 + $sr * [Math]::Cos($rad)
-    $cy = $cy0 + $sr * [Math]::Sin($rad)
-    # Angle de rotation de l'image = 0 : l'app reste droite (pas de spin).
-    Set-GhostFrame $cx $cy ([Math]::Max(1, $slideState.W0 * $scale)) ([Math]::Max(1, $slideState.H0 * $scale)) 0 $blurF $round $alpha
+    Set-GhostFrame $cx $cy ($slideState.W0 * $scale) ($slideState.H0 * $scale) $alpha
     if ($slideState.Frame -ge $slideState.Total) {
         $slideTimer.Stop()
         if ($slideState.Hiding) {
@@ -1705,9 +1665,9 @@ function Hide-App {
     $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
     $slideState.BubCx = $pos.X + $bw / 2.0; $slideState.BubCy = $pos.Y + $bh / 2.0
     $slideState.Frame = 0; $slideState.Hiding = $true
-    # Frame 0 = image pleine, nette, non pivotée => relais sans rupture avec la fenêtre.
+    # Frame 0 = image pleine et nette => relais sans rupture avec la fenêtre.
     [LayeredGhost]::Enable($ghost.Handle)
-    Set-GhostFrame $slideState.AppCx $slideState.AppCy $fb.Width $fb.Height 0 1.0 0.0 255
+    Set-GhostFrame $slideState.AppCx $slideState.AppCy $fb.Width $fb.Height 255
     $ghost.Visible = $true; $ghost.BringToFront()
     $form.Hide()
     $slideTimer.Start()
@@ -1724,9 +1684,9 @@ function Show-App {
     $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
     $slideState.BubCx = $bubble.Left + $bubble.Width / 2.0; $slideState.BubCy = $bubble.Top + $bubble.Height / 2.0
     $slideState.Frame = 0; $slideState.Hiding = $false
-    # Frame 0 = tout petit, flou, transparent (sans rotation), au centre de la bulle.
+    # Frame 0 = tout petit et transparent, au centre de la bulle.
     [LayeredGhost]::Enable($ghost.Handle)
-    Set-GhostFrame $slideState.BubCx $slideState.BubCy ([Math]::Max(1, $fb.Width * 0.04)) ([Math]::Max(1, $fb.Height * 0.04)) 0 10.0 1.0 30
+    Set-GhostFrame $slideState.BubCx $slideState.BubCy ($fb.Width * 0.04) ($fb.Height * 0.04) 40
     $bubble.Hide()
     $ghost.Visible = $true; $ghost.BringToFront()
     $slideTimer.Start()

@@ -4,6 +4,7 @@
 #   - NotesShownVersion   : version dont les notes ont déjà été montrées (anti-doublon)
 #   - TutorialSeen        : tutoriel déjà vu (1er lancement)
 #   - TutorialSeenVersion : version du CONTENU du tutoriel déjà vue
+#   - PreviewCollapsed    : préférence « aperçu replié » (restaurée au lancement)
 # ============================================================================
 
 function New-AppState {
@@ -14,6 +15,7 @@ function New-AppState {
         NotesShownVersion   = ''
         TutorialSeen        = $false
         TutorialSeenVersion = 0
+        PreviewCollapsed    = $false
     }
     try {
         if (Test-Path -LiteralPath $Path) {
@@ -24,6 +26,7 @@ function New-AppState {
                 if ($data.notes_shown_version) { $state.NotesShownVersion = [string]$data.notes_shown_version }
                 if ($null -ne $data.tutorial_seen)         { $state.TutorialSeen        = [bool]$data.tutorial_seen }
                 if ($null -ne $data.tutorial_seen_version) { $state.TutorialSeenVersion = [int]$data.tutorial_seen_version }
+                if ($null -ne $data.preview_collapsed)     { $state.PreviewCollapsed    = [bool]$data.preview_collapsed }
             }
         }
     } catch {
@@ -39,6 +42,7 @@ function Save-AppState {
         notes_shown_version   = [string]$State.NotesShownVersion
         tutorial_seen         = [bool]$State.TutorialSeen
         tutorial_seen_version = [int]$State.TutorialSeenVersion
+        preview_collapsed     = [bool]$State.PreviewCollapsed
     }
     $tmp = "$($State.Path).tmp"
     try {
