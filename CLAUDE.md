@@ -22,7 +22,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (copié depuis `dist-launcher/`, posé n'importe où — dossier OneDrive partagé, bureau…). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version. La publication d'une version = `.\build-zip.ps1` qui commit + push automatiquement `latest.json` + le zip versionné sur `origin` (GitHub).
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (copié depuis `dist-launcher/`, posé n'importe où — dossier OneDrive partagé, bureau…). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version.
+
+## Publier une mise à jour (démarche OBLIGATOIRE pour toute évolution)
+
+Le canal de distribution est le dépôt GitHub public **`Lixirian/arrivee-collab`** (branche `main`) : les apps installées et le lanceur y lisent `latest.json` + le zip versionné via raw.githubusercontent.com. Toute modification livrée aux utilisateurs suit ces étapes, dans l'ordre :
+
+1. **Incrémenter la version** dans `ArriveeCollab-PS/config.ps1` (`$Config.Version`, format `X.Y.Z` : mineur pour une fonctionnalité, patch pour un correctif).
+2. **Ajouter l'entrée changelog** correspondante en tête de `ArriveeCollab-PS/releases.json` (mêmes numéros de version ; ces notes alimentent le dialogue de la pastille et le « Quoi de neuf »). Rédiger pour l'utilisateur final, en français.
+3. Si le **contenu du tutoriel** a changé (`lib/Tutorial.ps1`), mettre à jour le texte des étapes ; incrémenter `$script:TutorialVersion` seulement si le tutoriel doit se ré-afficher à tous.
+4. **Lancer les tests** : `powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1` — tout doit passer.
+5. **Builder et publier** : `.\build-zip.ps1` — génère `Arrivee-Collab_version<X>.zip` + `latest.json`, archive l'ancien zip dans `Archives\`, régénère `dist-ready\`, puis **commit + push automatiquement sur `origin` (GitHub)**. Le push EST la publication : dans les ~5 minutes, les apps voient la nouvelle version et affichent la pastille. Aucun transfert manuel.
+6. **Cas particulier — lanceur modifié** : si `dist-launcher/` a changé, le build produit un bundle `Arrivee-Collab-maj-<X>.zip` marqué « COMPLET » ; il faut alors reposer manuellement le nouveau `.cmd`/`bootstrap.ps1` aux endroits où les utilisateurs le double-cliquent (le bootstrap ne se met pas à jour tout seul). Bundle « minimal » = rien à faire.
+
+Ne jamais committer de fichiers sensibles : `Mot de passe/`, `Archive message/` et `*.msg` sont exclus par `.gitignore` (le dépôt est PUBLIC).
 
 ## Architecture
 
