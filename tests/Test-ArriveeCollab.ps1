@@ -61,6 +61,18 @@ try {
     Assert ($m.Version -eq '1.2.0')                 'update : manifeste version'
     Assert ($m.Zip -eq 'Arrivee-Collab_version1.2.0.zip') 'update : manifeste zip'
     Assert (@($m.Notes).Count -eq 2)                'update : manifeste 2 notes'
+    Assert ($m.Source -eq 'dossier')                'update : source dossier (repli)'
+
+    # ConvertFrom-LatestJson (parse pur, partage GitHub/dossier)
+    $p = ConvertFrom-LatestJson '{ "version": "2.0.0", "notes": ["N"] }'
+    Assert ($p.Version -eq '2.0.0' -and $p.Zip -eq 'Arrivee-Collab_version2.0.0.zip') 'update : parse -> zip par defaut'
+    Assert ($null -eq (ConvertFrom-LatestJson '{ "zip": "x.zip" }')) 'update : parse sans version -> null'
+    Assert ($null -eq (ConvertFrom-LatestJson 'pas du json'))        'update : parse json invalide -> null'
+
+    # Get-UpdateRawBase : absent -> null ; configure -> URL raw
+    Assert ($null -eq (Get-UpdateRawBase $ctx)) 'update : pas de repo github -> base null'
+    $ctxGh = @{ Config = @{ UpdateRepo = 'user/repo'; UpdateBranch = '' } }
+    Assert ((Get-UpdateRawBase $ctxGh) -eq 'https://raw.githubusercontent.com/user/repo/main') 'update : base raw (branche main par defaut)'
 
     # Tri numérique de versions
     Assert ((Convert-VersionSortKey '1.10.0') -gt (Convert-VersionSortKey '1.9.0')) 'update : tri 1.10 > 1.9'
@@ -114,6 +126,8 @@ Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $true  
 Assert ((Should-AutoHide -AppHidden $true  -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : deja masquee => non'
 Assert ((Should-AutoHide -AppHidden $false -Animating $true  -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : animation en cours => non'
 Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 0    -OwnPid 1234) -eq $false) 'autohide : pas de fenetre premier plan => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $true)  -eq $false) 'autohide : option desactivee => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $false) -eq $true)  'autohide : option active => masquer'
 
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TOUS LES TESTS PASSENT" -ForegroundColor Green }

@@ -1,12 +1,12 @@
-Mot de passe/
-Archive message/
-.claude/
-
-# Artefacts de build (regeneres par build-zip.ps1)
+# Artefacts de build NON distribués par GitHub (le zip versionné courant et
+# latest.json, eux, SONT suivis : ils forment le canal de distribution raw).
+Archives/
 dist-ready/
 Arrivee-Collab-dist-ready.zip
 Arrivee-Collab-maj-*.zip
-Archives/
 
-# Terminal Paste Image folder
-.cp-images/
+# Restes de tests locaux : SENSIBLE (mots de passe, .msg) — jamais dans le dépôt.
+Mot de passe/
+Archive message/
+*.msg
+

@@ -1,8 +1,7 @@
 ﻿{
-    "version":  "1.5.1",
-    "zip":  "Arrivee-Collab_version1.5.1.zip",
+    "version":  "1.7.0",
+    "zip":  "Arrivee-Collab_version1.7.0.zip",
     "notes":  [
-                  "Animation de masquage plus fluide : l\u0027effet vortex (qui pouvait saccader) est remplacé par une simple apparition depuis la bulle et une rétractation vers la bulle.",
-                  "Le repli de l\u0027aperçu est mémorisé : si vous fermez l\u0027app avec l\u0027aperçu replié, elle se rouvre repliée au prochain lancement."
+                  "Mises à jour via GitHub : l\u0027application et le lanceur vérifient désormais la dernière version publiée sur le dépôt en ligne (sans aucun jeton) et la pastille propose la mise à jour automatiquement. Le dossier OneDrive reste un canal de secours."
               ]
 }

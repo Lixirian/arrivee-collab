@@ -1,8 +1,10 @@
 ﻿# ============================================================================
-#  Mise à jour automatique depuis un dossier de DISTRIBUTION (OneDrive/SharePoint).
-#  AUCUNE API, AUCUN jeton : on lit de simples FICHIERS (latest.json + zips).
-#  Ce fichier = LOGIQUE de détection + changelog hors-ligne. Les DIALOGUES WinForms
-#  et le self-update sont ajoutés plus bas (Task 2).
+#  Mise à jour automatique. CANAL PRINCIPAL : dépôt GitHub PUBLIC (lecture de
+#  latest.json + du zip versionné via raw.githubusercontent.com — AUCUN jeton,
+#  simple HTTPS à travers le proxy système). REPLI : dossier de DISTRIBUTION
+#  (OneDrive/SharePoint) si GitHub est inaccessible ou non configuré.
+#  Ce fichier = LOGIQUE de détection + changelog hors-ligne + DIALOGUES WinForms
+#  + self-update.
 # ============================================================================
 
 # Résout le dossier de distribution : Config.UpdateDir (relatif sous OneDrive, ou
@@ -32,23 +34,73 @@ function Get-UpdateDir {
     return $null
 }
 
-# Lit latest.json -> @{ Version; Zip; Notes(@()) } ou $null.
-function Get-LatestManifest {
+# Base des URLs « raw » du dépôt GitHub de distribution (canal principal), ou $null
+# si non configuré (Config.UpdateRepo = 'owner/repo', Config.UpdateBranch = 'main').
+function Get-UpdateRawBase {
     param($Ctx)
-    $dir = Get-UpdateDir $Ctx
-    if (-not $dir) { return $null }
-    $mf = Join-Path $dir 'latest.json'
-    if (-not (Test-Path -LiteralPath $mf)) { return $null }
+    $repo = [string]$Ctx.Config.UpdateRepo
+    if (-not $repo) { return $null }
+    $branch = [string]$Ctx.Config.UpdateBranch
+    if (-not $branch) { $branch = 'main' }
+    return "https://raw.githubusercontent.com/$repo/$branch"
+}
+
+# Télécharge une URL : renvoie le TEXTE (sans -OutFile) ou écrit le fichier et renvoie
+# $true. TLS 1.2 forcé + proxy système avec identifiants par défaut (postes SNCF
+# derrière proxy authentifié). LÈVE en cas d'échec : l'appelant gère le repli.
+function Invoke-UpdateDownload {
+    param([string]$Uri, [string]$OutFile)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $wc = New-Object System.Net.WebClient
     try {
-        $raw = Get-Content -LiteralPath $mf -Raw -Encoding UTF8
-        if (-not $raw) { return $null }
-        $j = $raw | ConvertFrom-Json
+        $wc.Headers['User-Agent'] = 'ArriveeCollab-Update'
+        $wc.Headers['Cache-Control'] = 'no-cache'
+        if ($wc.Proxy) { $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials }
+        if ($OutFile) { $wc.DownloadFile($Uri, $OutFile); return $true }
+        return $wc.DownloadString($Uri)
+    } finally { $wc.Dispose() }
+}
+
+# Parse le CONTENU d'un latest.json -> @{ Version; Zip; Notes(@()) } ou $null.
+# Fonction pure (testable hors ligne), partagée par les deux canaux.
+function ConvertFrom-LatestJson {
+    param([string]$Raw)
+    if (-not $Raw) { return $null }
+    try {
+        $j = $Raw | ConvertFrom-Json
         if (-not $j.version) { return $null }
         $zip = [string]$j.zip
         if (-not $zip) { $zip = "Arrivee-Collab_version$([string]$j.version).zip" }
         $notes = @()
         if ($j.notes) { $notes = @($j.notes | ForEach-Object { [string]$_ }) }
         return @{ Version = [string]$j.version; Zip = $zip; Notes = $notes }
+    } catch { return $null }
+}
+
+# Lit latest.json -> @{ Version; Zip; Notes; Source ('github'|'dossier') } ou $null.
+# Essaie GITHUB d'abord (cache-bust : le CDN raw peut servir ~5 min de cache), puis
+# se replie sur le dossier de distribution.
+function Get-LatestManifest {
+    param($Ctx)
+    $base = Get-UpdateRawBase $Ctx
+    if ($base) {
+        try {
+            $raw = [string](Invoke-UpdateDownload -Uri ("{0}/latest.json?nocache={1}" -f $base, [DateTime]::UtcNow.Ticks))
+            $m = ConvertFrom-LatestJson $raw
+            if ($m) { $m.Source = 'github'; return $m }
+            Write-AppLog "[MAJ] latest.json GitHub illisible : repli sur le dossier."
+        } catch {
+            Write-AppLog "[MAJ] GitHub inaccessible ($($_.Exception.Message)) : repli sur le dossier."
+        }
+    }
+    $dir = Get-UpdateDir $Ctx
+    if (-not $dir) { return $null }
+    $mf = Join-Path $dir 'latest.json'
+    if (-not (Test-Path -LiteralPath $mf)) { return $null }
+    try {
+        $m = ConvertFrom-LatestJson (Get-Content -LiteralPath $mf -Raw -Encoding UTF8)
+        if ($m) { $m.Source = 'dossier' }
+        return $m
     } catch {
         Write-AppLog "[MAJ] Lecture latest.json KO : $($_.Exception.Message)"
         return $null
@@ -123,18 +175,24 @@ function Get-ReleaseNotesBetween {
     return $out
 }
 
-# Vérifie s'il existe une version plus récente ET dont le zip est présent ; met à jour
-# $Ctx.UpdateAvailable + la pastille. Ne lève jamais (dossier hors ligne = silencieux).
+# Vérifie s'il existe une version plus récente ; met à jour $Ctx.UpdateAvailable + la
+# pastille. Source GitHub : le zip est réputé présent (poussé avec latest.json par
+# build-zip.ps1 ; son téléchargement est re-vérifié au moment du self-update). Source
+# dossier : ne proposer que si le zip annoncé est bien là. Ne lève jamais.
 function Invoke-UpdateCheck {
     param($Ctx)
     try {
         $m = Get-LatestManifest $Ctx
         if ($m -and (Compare-AppVersion $m.Version $Ctx.Config.Version) -gt 0) {
-            $dir = Get-UpdateDir $Ctx
-            $zipPath = if ($dir) { Join-Path $dir $m.Zip } else { $null }
-            if ($zipPath -and (Test-Path -LiteralPath $zipPath)) {
+            $zipOk = $true
+            if ($m.Source -ne 'github') {
+                $dir = Get-UpdateDir $Ctx
+                $zipPath = if ($dir) { Join-Path $dir $m.Zip } else { $null }
+                $zipOk = [bool]($zipPath -and (Test-Path -LiteralPath $zipPath))
+            }
+            if ($zipOk) {
                 if (-not $Ctx.UpdateAvailable -or $Ctx.UpdateAvailable.Version -ne $m.Version) {
-                    Write-AppLog ("[MAJ] Nouvelle version disponible : {0} (actuelle {1})." -f $m.Version, $Ctx.Config.Version)
+                    Write-AppLog ("[MAJ] Nouvelle version disponible : {0} (actuelle {1}, source {2})." -f $m.Version, $Ctx.Config.Version, $m.Source)
                 }
                 $Ctx.UpdateAvailable = $m
             } else {
@@ -278,15 +336,26 @@ function Invoke-SelfUpdate {
     try {
         $m = $Ctx.UpdateAvailable
         if (-not $m) { return }
-        $dir = Get-UpdateDir $Ctx
-        if (-not $dir) { Write-AppLog "[MAJ] Dossier de distribution indisponible."; return }
-        $srcZip = Join-Path $dir $m.Zip
-        if (-not (Test-Path -LiteralPath $srcZip)) { Write-AppLog "[MAJ] Zip source introuvable : $srcZip"; return }
-
         $upDir = Join-Path $Ctx.DataDir 'update'
         if (-not (Test-Path -LiteralPath $upDir)) { New-Item -ItemType Directory -Path $upDir -Force | Out-Null }
         $localZip = Join-Path $upDir ("new_$($m.Version).zip")
-        Copy-Item -LiteralPath $srcZip -Destination $localZip -Force
+
+        if ($m.Source -eq 'github') {
+            # Canal GitHub : téléchargement du zip versionné depuis le dépôt.
+            $base = Get-UpdateRawBase $Ctx
+            if (-not $base) { Write-AppLog "[MAJ] Dépôt GitHub non configuré."; return }
+            try {
+                [void](Invoke-UpdateDownload -Uri ("$base/$($m.Zip)") -OutFile $localZip)
+                Write-AppLog ("[MAJ] Zip {0} téléchargé depuis GitHub." -f $m.Zip)
+            } catch { Write-AppLog "[MAJ] Téléchargement GitHub KO : $($_.Exception.Message)"; return }
+        } else {
+            # Repli : copie depuis le dossier de distribution.
+            $dir = Get-UpdateDir $Ctx
+            if (-not $dir) { Write-AppLog "[MAJ] Dossier de distribution indisponible."; return }
+            $srcZip = Join-Path $dir $m.Zip
+            if (-not (Test-Path -LiteralPath $srcZip)) { Write-AppLog "[MAJ] Zip source introuvable : $srcZip"; return }
+            Copy-Item -LiteralPath $srcZip -Destination $localZip -Force
+        }
 
         $appRoot   = $Ctx.AppRoot
         $launcher  = Join-Path $appRoot 'Start-ArriveeCollab.vbs'

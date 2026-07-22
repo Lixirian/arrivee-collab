@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app vérifie périodiquement le dossier de distribution et propose d'installer la nouvelle version.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (copié depuis `dist-launcher/`, posé n'importe où — dossier OneDrive partagé, bureau…). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version. La publication d'une version = `.\build-zip.ps1` qui commit + push automatiquement `latest.json` + le zip versionné sur `origin` (GitHub).
 
 ## Architecture
 
@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 ```
 ArriveeCollab-PS/          ← code source
   arrivee collab.ps1       ← script principal (~1156 lignes)
-  config.ps1               ← version de l'app + UpdateDir (URL OneDrive)
+  config.ps1               ← version de l'app + UpdateRepo (dépôt GitHub) + UpdateDir (repli OneDrive)
   releases.json            ← changelog versionné
   image-arrivee-collab.ico
   Resources/               ← images embarquées dans le mail (obligatoire)
@@ -120,11 +120,11 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 ### Scripts secondaires
 
 - **`ArriveeCollab-PS/Start-ArriveeCollab.vbs`** / **`.cmd`** — Lanceurs locaux (développement) : exécutent le PS1 en mode fenêtre masquée, sans élévation UAC
-- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le OneDrive, installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
+- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le dépôt GitHub public (repli : dossier local du .cmd), installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
 - **`build-zip.ps1`** — Packaging : crée un zip versionné (`Arrivee-Collab_version<X>.zip`), génère `latest.json`, peuple `dist-ready/` avec les bundles complets, et tente un commit/push vers `origin`
 - **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`
 - **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`
-- **`lib/Update.ps1`** — détection MAJ, pastille, dialogues, self-update, Quoi de neuf
+- **`lib/Update.ps1`** — détection MAJ (GitHub raw en canal principal, dossier OneDrive en repli), pastille, dialogues, self-update, Quoi de neuf
 - **`lib/Tutorial.ps1`** — tutoriel interactif data-driven (carte + surbrillance) : s'affiche automatiquement au premier lancement (~1,4 s après ouverture) et peut être rejoué à tout moment via le bouton « ? » en haut à droite. Versionné (`$script:TutorialVersion`) ; 10 étapes définies dans `Get-TutorialSteps`, état persisté dans `state.json` (`TutorialSeen` / `TutorialSeenVersion`)
 
 ### Dossiers

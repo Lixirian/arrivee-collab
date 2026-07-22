@@ -7,9 +7,16 @@ $Config = @{
     # Version de l'application. À INCRÉMENTER à chaque build (build-zip.ps1).
     # Au lancement, si elle diffère de la version persistée dans state.json,
     # l'app déclenche le dialogue « Quoi de neuf » (via lib/Update.ps1).
-    Version                = '1.5.1'
+    Version                = '1.7.0'
 
-    # Dossier de DISTRIBUTION OneDrive contenant latest.json + les zips versionnés.
+    # ----- Mise à jour : canal PRINCIPAL GitHub -----
+    # Dépôt GitHub PUBLIC 'owner/repo' contenant latest.json + les zips versionnés
+    # (poussés automatiquement par build-zip.ps1). Lecture SANS jeton via
+    # raw.githubusercontent.com, à travers le proxy système. Vide = désactivé.
+    UpdateRepo             = 'Lixirian/arrivee-collab'
+    UpdateBranch           = 'main'
+
+    # ----- Repli : dossier de DISTRIBUTION OneDrive (si GitHub inaccessible) -----
     # AUCUNE API, AUCUN jeton : simple lecture de fichiers (lecture seule côté équipe).
     #  - Relatif (ex. 'Documents\...') : cherche sous chaque racine OneDrive connue.
     #  - Absolu / UNC accepté aussi.

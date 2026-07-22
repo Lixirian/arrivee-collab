@@ -1,4 +1,10 @@
 ﻿{
+    "1.7.0": [
+        "Mises à jour via GitHub : l'application et le lanceur vérifient désormais la dernière version publiée sur le dépôt en ligne (sans aucun jeton) et la pastille propose la mise à jour automatiquement. Le dossier OneDrive reste un canal de secours."
+    ],
+    "1.6.0": [
+        "Nouvelle option « Réduction automatique en bulle » : un clic droit sur le bouton « » » (ou sur la bulle) permet de la décocher pour garder la fenêtre affichée en permanence, même en travaillant dans une autre application. Le choix est mémorisé ; le repli manuel via « » » reste possible."
+    ],
     "1.5.1": [
         "Animation de masquage plus fluide : l'effet vortex (qui pouvait saccader) est remplacé par une simple apparition depuis la bulle et une rétractation vers la bulle.",
         "Le repli de l'aperçu est mémorisé : si vous fermez l'app avec l'aperçu replié, elle se rouvre repliée au prochain lancement."

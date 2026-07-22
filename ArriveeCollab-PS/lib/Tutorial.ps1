@@ -51,7 +51,7 @@ function Get-TutorialSteps {
            Text  = "Ce bouton aspire la fenêtre dans une petite bulle ronde posée sur le bord de l'écran. Cliquez la bulle pour faire réapparaître l'app, glissez-la pour la déplacer (elle s'aimante au bord gauche ou droit), ou clic droit pour fermer l'outil."
            Target = { $btnHide } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F9F2)); Title = 'Masquage automatique'
-           Text  = "Plus besoin de cliquer : dès que vous basculez vers une autre application, l'outil se replie tout seul dans cette bulle pour rester visible sans vous gêner. Cliquez la bulle pour le ramener. Pendant la création du .msg (et son ouverture dans Outlook), l'app reste affichée pour vous laisser terminer."
+           Text  = "Plus besoin de cliquer : dès que vous basculez vers une autre application, l'outil se replie tout seul dans cette bulle pour rester visible sans vous gêner. Cliquez la bulle pour le ramener. Pendant la création du .msg (et son ouverture dans Outlook), l'app reste affichée pour vous laisser terminer. Vous préférez garder la fenêtre affichée en permanence ? Clic droit sur ce bouton (ou sur la bulle) et décochez « Réduction automatique en bulle » — le choix est mémorisé."
            Target = { $btnHide } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F389)); Title = "C'est parti !"
            Text  = "Vous êtes prêt. Les mises à jour de l'outil vous présenteront automatiquement les nouveautés. Vous pouvez rejouer ce tutoriel à tout moment via le bouton « ? » en haut à droite."

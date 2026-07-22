@@ -1394,6 +1394,10 @@ $form.Add_Shown({
 $global:AppHidden = $false
 # Drapeau : suspend le masquage automatique pendant le flux de génération du .msg.
 $global:SuppressAutoHide = $false
+# Préférence UTILISATEUR : ne pas replier en bulle à la perte de focus (la fenêtre
+# reste visible sur le côté). Basculable par clic droit sur « » » ou sur la bulle ;
+# persistée dans state.json. Le masquage MANUEL (clic sur « » ») reste possible.
+$global:AutoHideDisabled = [bool]$global:Ctx.State.AutoHideDisabled
 # Dernière position de la bulle ($null = jamais déplacée => position par défaut).
 $global:BubbleLastPos = $null
 # Position d'apparition résolue au masquage + bounds pleins de l'app (pour l'animation).
@@ -1700,6 +1704,8 @@ $btnHide.Add_Click({ Hide-App })
 #  mono-coup de 200 ms laisse le nouveau premier plan se stabiliser ; on ne
 #  masque que si sa fenêtre appartient à un autre processus (cf. Should-AutoHide,
 #  lib/Common.ps1). Couvre ainsi dialogues, popup calendrier, tutoriel, bulle.
+#  Désactivable via l'option « Réduction automatique en bulle » (clic droit sur
+#  le bouton « » » ou sur la bulle) — voir Set-AutoHideDisabled plus bas.
 # ============================================================================
 $timerAutoHide = New-Object Windows.Forms.Timer
 $timerAutoHide.Interval = 200
@@ -1708,12 +1714,12 @@ $timerAutoHide.Add_Tick({
     $h = [Win32.Fg]::GetForegroundWindow()
     $fgPid = [uint32]0
     if ($h -ne [IntPtr]::Zero) { [void][Win32.Fg]::GetWindowThreadProcessId($h, [ref]$fgPid) }
-    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID) {
+    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID -Disabled $global:AutoHideDisabled) {
         Hide-App
     }
 }.GetNewClosure())
 $form.Add_Deactivate({
-    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide) { return }
+    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide -or $global:AutoHideDisabled) { return }
     $timerAutoHide.Stop(); $timerAutoHide.Start()
 }.GetNewClosure())
 # (le clic simple sur la bulle est géré par MouseUp ci-dessus : tap = afficher, glisser = déplacer)
@@ -1730,6 +1736,34 @@ $miClose = $bubbleMenu.Items.Add("Fermer l'application")
 $miClose.add_Click({ $global:AppHidden = $false; $bubble.Hide(); $form.Close() })
 $bubble.ContextMenuStrip = $bubbleMenu
 $picBubble.ContextMenuStrip = $bubbleMenu
+
+# ============================================================================
+#  Option « Réduction automatique en bulle » : certains collègues préfèrent garder
+#  la fenêtre visible sur le côté en travaillant dans une autre application. Item
+#  COCHABLE accessible par clic droit sur le bouton « » » ET sur la bulle ; décoché,
+#  l'app ne se replie plus à la perte de focus (le repli manuel via « » » reste
+#  possible). Préférence persistée dans state.json (auto_hide_disabled).
+# ============================================================================
+function Set-AutoHideDisabled([bool]$Disabled) {
+    $global:AutoHideDisabled = $Disabled
+    $global:Ctx.State.AutoHideDisabled = $Disabled
+    try { Save-AppState $global:Ctx.State } catch { }
+}
+$hideMenu = New-Object Windows.Forms.ContextMenuStrip
+$hideMenu.BackColor = $cBgSecondary
+$hideMenu.ForeColor = $cTextPrimary
+$hideMenu.ShowImageMargin = $false
+$hideMenu.ShowCheckMargin = $true
+$miAutoHideBtn = $hideMenu.Items.Add("Réduction automatique en bulle")
+$miAutoHideBtn.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
+$hideMenu.add_Opening({ $miAutoHideBtn.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
+$btnHide.ContextMenuStrip = $hideMenu
+
+$bubbleMenu.ShowCheckMargin = $true
+[void]$bubbleMenu.Items.Add((New-Object Windows.Forms.ToolStripSeparator))
+$miAutoHideBub = $bubbleMenu.Items.Add("Réduction automatique en bulle")
+$miAutoHideBub.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
+$bubbleMenu.add_Opening({ $miAutoHideBub.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
 
 $form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
 

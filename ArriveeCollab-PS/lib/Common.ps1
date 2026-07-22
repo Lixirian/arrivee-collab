@@ -92,7 +92,8 @@ function Write-AppLog {
 #  Décision pure : faut-il replier l'app en bulle quand elle perd le focus ?
 #  Vrai uniquement si la fenêtre désormais au premier plan appartient à un
 #  AUTRE processus (et qu'on n'est ni déjà masqué, ni en animation, ni dans
-#  le flux de génération du .msg où le masquage est volontairement suspendu).
+#  le flux de génération du .msg où le masquage est volontairement suspendu,
+#  ni avec la préférence utilisateur « garder la fenêtre affichée » active).
 #  Extrait en fonction testable : la logique est ainsi couverte hors-GUI.
 # ----------------------------------------------------------------------------
 function Should-AutoHide {
@@ -101,8 +102,10 @@ function Should-AutoHide {
         [bool]$Animating,
         [bool]$Suppressed,
         [int]$ForegroundPid,
-        [int]$OwnPid
+        [int]$OwnPid,
+        [bool]$Disabled = $false
     )
+    if ($Disabled)                  { return $false }
     if ($Suppressed)                { return $false }
     if ($AppHidden)                 { return $false }
     if ($Animating)                 { return $false }
