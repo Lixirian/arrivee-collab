@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.7.0",
-    "zip":  "Arrivee-Collab_version1.7.0.zip",
+    "version":  "1.8.0",
+    "zip":  "Arrivee-Collab_version1.8.0.zip",
     "notes":  [
-                  "Mises à jour via GitHub : l\u0027application et le lanceur vérifient désormais la dernière version publiée sur le dépôt en ligne (sans aucun jeton) et la pastille propose la mise à jour automatiquement. Le dossier OneDrive reste un canal de secours."
+                  "La préférence « Réduction auto en bulle » est désormais une case à cocher visible en haut à droite du formulaire (sous les images), en plus du clic droit sur « » » ou sur la bulle. Décochée, la fenêtre reste affichée quand vous passez sur une autre application."
               ]
 }

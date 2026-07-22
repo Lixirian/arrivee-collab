@@ -788,6 +788,23 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
     $lblStatusImg.Text = "Vérifier les images !"; $lblStatusImg.ForeColor = $cDanger
 }
 
+# Case à cocher VISIBLE de la préférence « réduction automatique en bulle » (la même
+# option que le clic droit sur « » » / sur la bulle, plus explicite). Cochée = l'app
+# se replie en bulle à la perte de focus ; décochée = elle reste affichée. Synchronisée
+# dans les deux sens avec les menus contextuels via Set-AutoHideDisabled.
+$chkAutoBulle = New-Object Windows.Forms.CheckBox
+$chkAutoBulle.Text = "Réduction auto en bulle"
+$chkAutoBulle.Location = New-Object Drawing.Point(830, 100)
+$chkAutoBulle.Size = New-Object Drawing.Size(200, 28)
+$chkAutoBulle.ForeColor = $cTextSecondary
+$chkAutoBulle.BackColor = $cBgSecondary
+$chkAutoBulle.Font = [Drawing.Font]::new("Segoe UI", 9)
+$chkAutoBulle.FlatStyle = 'Flat'
+$chkAutoBulle.Cursor = [Windows.Forms.Cursors]::Hand
+$chkAutoBulle.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$chkAutoBulle.Checked = -not [bool]$global:Ctx.State.AutoHideDisabled
+$chkAutoBulle.Add_CheckedChanged({ Set-AutoHideDisabled (-not $chkAutoBulle.Checked) })
+
 # Ligne 3 : Checkbox mot de passe déjà initialisé + DateTimePicker
 $chkMdpDejaInit = New-Object Windows.Forms.CheckBox
 $chkMdpDejaInit.Text = "  Mot de passe déjà initialisé"
@@ -850,7 +867,7 @@ $chkMdpDejaInit.Add_CheckedChanged({
 
 $dtpDateInit.Add_ValueChanged({ Update-Preview })
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg))
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -1747,6 +1764,9 @@ $picBubble.ContextMenuStrip = $bubbleMenu
 function Set-AutoHideDisabled([bool]$Disabled) {
     $global:AutoHideDisabled = $Disabled
     $global:Ctx.State.AutoHideDisabled = $Disabled
+    # Reflète l'état sur la case à cocher du formulaire (assigner une valeur identique
+    # ne re-déclenche pas CheckedChanged : pas de boucle).
+    try { $chkAutoBulle.Checked = -not $Disabled } catch { }
     try { Save-AppState $global:Ctx.State } catch { }
 }
 $hideMenu = New-Object Windows.Forms.ContextMenuStrip
