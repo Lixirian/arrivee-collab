@@ -5,7 +5,9 @@
 #  - Génère latest.json (version + zip + notes depuis releases.json).
 #  - Archive les anciennes versions dans Archives\.
 #  - Assemble dist-ready\ (lanceur + zip + latest.json) + zips d'export.
-#  - En fin : COMMIT + PUSH automatique sur origin (best-effort ; -NoGit pour s'en passer).
+#  - En fin : COMMIT + PUSH automatique sur origin, y compris sur la branche de
+#    publication lue par les apps ($Config.UpdateBranch), puis CONTRÔLE que cette
+#    branche distante porte bien ce build (best-effort ; -NoGit pour s'en passer).
 #  Usage :  powershell -ExecutionPolicy Bypass -File build-zip.ps1 [-NoGit]
 # ============================================================================
 param([switch]$NoGit)
@@ -18,6 +20,12 @@ $m = [regex]::Match($cfg, "Version\s*=\s*'([^']+)'")
 if (-not $m.Success) { throw "Version introuvable dans config.ps1 (attendu : Version = '<x>')." }
 $ver = $m.Groups[1].Value
 $name = "Arrivee-Collab_version$ver"
+
+# Branche RÉELLEMENT lue par les apps installées et par le bootstrap
+# (raw.githubusercontent.com/<repo>/<branche>/latest.json). Même source de vérité
+# que l'app : config.ps1. Publier ailleurs = publier dans le vide.
+$mb = [regex]::Match($cfg, "UpdateBranch\s*=\s*'([^']*)'")
+$pubBranch = if ($mb.Success -and $mb.Groups[1].Value) { $mb.Groups[1].Value } else { 'main' }
 
 # Staging : copie temporaire renommée pour que le dossier racine du zip = $name.
 $staging = Join-Path ([System.IO.Path]::GetTempPath()) $name
@@ -118,16 +126,39 @@ if (-not $NoGit) {
                 & git commit -F $tmpMsg 2>$null | Out-Null
                 $committed = ($LASTEXITCODE -eq 0)
                 Remove-Item -LiteralPath $tmpMsg -Force -ErrorAction SilentlyContinue
-                if ($committed) {
-                    Write-Host "Git : commit 'Version $ver' créé."
-                    $hasOrigin = ((& git remote 2>$null) -contains 'origin')
-                    if ($hasOrigin) {
-                        & git push origin HEAD 2>$null | Out-Null
-                        if ($LASTEXITCODE -eq 0) { Write-Host "Git : push vers origin OK." }
-                        else { Write-Host "Git : PUSH KO (hors ligne ?). Commit local : refaire 'git push' plus tard." }
-                    } else { Write-Host "Git : pas de remote 'origin' -> commit local seulement." }
-                } else { Write-Host "Git : commit KO (voir 'git status')." }
+                if ($committed) { Write-Host "Git : commit 'Version $ver' créé." }
+                else { Write-Host "Git : commit KO (voir 'git status')." }
             } else { Write-Host "Git : rien à committer." }
+
+            # --- Publication : faire avancer la branche que lisent les apps ---
+            # Volontairement HORS du test « y a-t-il quelque chose à committer » :
+            # un build sans changement doit quand même vérifier (et rétablir) l'état
+            # publié. C'est ce contrôle qui évite les publications fantômes.
+            $hasOrigin = ((& git remote 2>$null) -contains 'origin')
+            if ($hasOrigin) {
+                $cur = (& git rev-parse --abbrev-ref HEAD 2>$null)
+                & git push origin HEAD 2>$null | Out-Null          # branche de travail
+                if ($cur -ne $pubBranch) {
+                    & git push origin "HEAD:$pubBranch" 2>$null | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "Git : push vers '$pubBranch' REFUSÉ (branche distante divergente ?)."
+                        Write-Host "      Rattrapage : git fetch origin ; git merge -s ours origin/$pubBranch ; git push origin HEAD:$pubBranch"
+                    }
+                }
+                # Contrôle final : le SHA distant de la branche de publication doit
+                # être celui du build. Sinon, personne ne recevra cette version.
+                $localSha = (& git rev-parse HEAD 2>$null)
+                $remoteLine = (& git ls-remote origin "refs/heads/$pubBranch" 2>$null)
+                $remoteSha = if ($remoteLine) { (([string]$remoteLine) -split '\s+')[0] } else { '' }
+                if ($remoteSha -and $remoteSha -eq $localSha) {
+                    Write-Host "PUBLICATION OK : origin/$pubBranch porte la version $ver (pastille visible sous ~5 min)."
+                } else {
+                    Write-Host "PUBLICATION KO : origin/$pubBranch ne pointe PAS sur ce build."
+                    Write-Host "      local   = $localSha"
+                    Write-Host ("      distant = {0}" -f $(if ($remoteSha) { $remoteSha } else { '(branche absente ou hors ligne)' }))
+                    Write-Host "      -> tant que ce n'est pas corrigé, AUCUN utilisateur ne recevra la $ver."
+                }
+            } else { Write-Host "Git : pas de remote 'origin' -> commit local seulement." }
         } else { Write-Host "Git : pas un dépôt git -> étape ignorée." }
     } catch { Write-Host "Git : étape ignorée ($($_.Exception.Message))." }
     finally { Pop-Location; $ErrorActionPreference = $prevEAP }

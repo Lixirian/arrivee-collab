@@ -10,3 +10,8 @@ Mot de passe/
 Archive message/
 *.msg
 
+# Réglages locaux à la machine (éditeur, outils) : jamais partagés.
+.vscode/
+.claude/
+.cp-images/
+
