@@ -15,6 +15,27 @@ Assert ((Compare-AppVersion '1.2.0' '1.2.0') -eq 0)  'compare : égalité'
 Assert ((Compare-AppVersion '1.0.10' '1.0.2') -eq 1) 'compare : 1.0.10 > 1.0.2 (numérique)'
 Assert ((Compare-AppVersion '2.0' '1.9.9') -eq 1)    'compare : longueurs différentes'
 
+# --- Décompte « il y a X jours » -> date d'initialisation ---
+Assert ((ConvertTo-NombreDeJours '0') -eq 0)      'jours : 0 accepte'
+Assert ((ConvertTo-NombreDeJours '45') -eq 45)    'jours : entier accepte'
+Assert ((ConvertTo-NombreDeJours ' 7 ') -eq 7)    'jours : espaces ignores'
+Assert ($null -eq (ConvertTo-NombreDeJours ''))   'jours : vide -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours $null)) 'jours : null -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours 'abc')) 'jours : texte -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours '-3'))  'jours : negatif -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours '1,5')) 'jours : decimal -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours '99999')) 'jours : au-dela du max -> null'
+Assert ($null -eq (ConvertTo-NombreDeJours '99999999999')) 'jours : trop grand pour un int -> null'
+Assert ((ConvertTo-NombreDeJours '3650') -eq 3650) 'jours : max inclus'
+
+$ref = [datetime]'2026-07-28'
+Assert ((Get-DateDepuisJours 0 $ref)  -eq [datetime]'2026-07-28') 'date : 0 jour -> aujourd hui'
+Assert ((Get-DateDepuisJours 1 $ref)  -eq [datetime]'2026-07-27') 'date : 1 jour -> veille'
+Assert ((Get-DateDepuisJours 30 $ref) -eq [datetime]'2026-06-28') 'date : 30 jours -> mois precedent'
+Assert ((Get-DateDepuisJours 209 $ref) -eq [datetime]'2025-12-31') 'date : bascule d annee'
+Assert (((Get-DateDepuisJours 5 ([datetime]'2026-07-28 16:42:11')).TimeOfDay) -eq [timespan]::Zero) 'date : heure remise a minuit'
+Assert ((Get-DateDepuisJours 1 ([datetime]'2024-03-01')) -eq [datetime]'2024-02-29') 'date : annee bissextile'
+
 # --- State round-trip + migration ---
 . (Join-Path $lib 'State.ps1')
 $tmpState = Join-Path $env:TEMP ("ac_state_test_" + [guid]::NewGuid().ToString('N') + ".json")
@@ -61,6 +82,18 @@ try {
     Assert ($m.Version -eq '1.2.0')                 'update : manifeste version'
     Assert ($m.Zip -eq 'Arrivee-Collab_version1.2.0.zip') 'update : manifeste zip'
     Assert (@($m.Notes).Count -eq 2)                'update : manifeste 2 notes'
+    Assert ($m.Source -eq 'dossier')                'update : source dossier (repli)'
+
+    # ConvertFrom-LatestJson (parse pur, partage GitHub/dossier)
+    $p = ConvertFrom-LatestJson '{ "version": "2.0.0", "notes": ["N"] }'
+    Assert ($p.Version -eq '2.0.0' -and $p.Zip -eq 'Arrivee-Collab_version2.0.0.zip') 'update : parse -> zip par defaut'
+    Assert ($null -eq (ConvertFrom-LatestJson '{ "zip": "x.zip" }')) 'update : parse sans version -> null'
+    Assert ($null -eq (ConvertFrom-LatestJson 'pas du json'))        'update : parse json invalide -> null'
+
+    # Get-UpdateRawBase : absent -> null ; configure -> URL raw
+    Assert ($null -eq (Get-UpdateRawBase $ctx)) 'update : pas de repo github -> base null'
+    $ctxGh = @{ Config = @{ UpdateRepo = 'user/repo'; UpdateBranch = '' } }
+    Assert ((Get-UpdateRawBase $ctxGh) -eq 'https://raw.githubusercontent.com/user/repo/main') 'update : base raw (branche main par defaut)'
 
     # Tri numérique de versions
     Assert ((Convert-VersionSortKey '1.10.0') -gt (Convert-VersionSortKey '1.9.0')) 'update : tri 1.10 > 1.9'
@@ -114,6 +147,8 @@ Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $true  
 Assert ((Should-AutoHide -AppHidden $true  -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : deja masquee => non'
 Assert ((Should-AutoHide -AppHidden $false -Animating $true  -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : animation en cours => non'
 Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 0    -OwnPid 1234) -eq $false) 'autohide : pas de fenetre premier plan => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $true)  -eq $false) 'autohide : option desactivee => non'
+Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $false) -eq $true)  'autohide : option active => masquer'
 
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TOUS LES TESTS PASSENT" -ForegroundColor Green }

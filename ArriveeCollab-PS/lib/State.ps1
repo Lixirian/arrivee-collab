@@ -5,6 +5,7 @@
 #   - TutorialSeen        : tutoriel déjà vu (1er lancement)
 #   - TutorialSeenVersion : version du CONTENU du tutoriel déjà vue
 #   - PreviewCollapsed    : préférence « aperçu replié » (restaurée au lancement)
+#   - AutoHideDisabled    : préférence « ne pas replier en bulle à la perte de focus »
 # ============================================================================
 
 function New-AppState {
@@ -16,6 +17,7 @@ function New-AppState {
         TutorialSeen        = $false
         TutorialSeenVersion = 0
         PreviewCollapsed    = $false
+        AutoHideDisabled    = $false
     }
     try {
         if (Test-Path -LiteralPath $Path) {
@@ -27,6 +29,7 @@ function New-AppState {
                 if ($null -ne $data.tutorial_seen)         { $state.TutorialSeen        = [bool]$data.tutorial_seen }
                 if ($null -ne $data.tutorial_seen_version) { $state.TutorialSeenVersion = [int]$data.tutorial_seen_version }
                 if ($null -ne $data.preview_collapsed)     { $state.PreviewCollapsed    = [bool]$data.preview_collapsed }
+                if ($null -ne $data.auto_hide_disabled)    { $state.AutoHideDisabled    = [bool]$data.auto_hide_disabled }
             }
         }
     } catch {
@@ -43,6 +46,7 @@ function Save-AppState {
         tutorial_seen         = [bool]$State.TutorialSeen
         tutorial_seen_version = [int]$State.TutorialSeenVersion
         preview_collapsed     = [bool]$State.PreviewCollapsed
+        auto_hide_disabled    = [bool]$State.AutoHideDisabled
     }
     $tmp = "$($State.Path).tmp"
     try {

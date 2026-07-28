@@ -22,7 +22,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (dossier OneDrive de distribution, copié depuis `dist-launcher/`). Le bootstrap installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app vérifie périodiquement le dossier de distribution et propose d'installer la nouvelle version.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (copié depuis `dist-launcher/`, posé n'importe où — dossier OneDrive partagé, bureau…). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version.
+
+## Publier une mise à jour (démarche OBLIGATOIRE pour toute évolution)
+
+Le canal de distribution est le dépôt GitHub public **`Lixirian/arrivee-collab`** (branche `main`) : les apps installées et le lanceur y lisent `latest.json` + le zip versionné via raw.githubusercontent.com. Toute modification livrée aux utilisateurs suit ces étapes, dans l'ordre :
+
+1. **Incrémenter la version** dans `ArriveeCollab-PS/config.ps1` (`$Config.Version`, format `X.Y.Z` : mineur pour une fonctionnalité, patch pour un correctif).
+2. **Ajouter l'entrée changelog** correspondante en tête de `ArriveeCollab-PS/releases.json` (mêmes numéros de version ; ces notes alimentent le dialogue de la pastille et le « Quoi de neuf »). Rédiger pour l'utilisateur final, en français.
+3. Si le **contenu du tutoriel** a changé (`lib/Tutorial.ps1`), mettre à jour le texte des étapes ; incrémenter `$script:TutorialVersion` seulement si le tutoriel doit se ré-afficher à tous.
+4. **Lancer les tests** : `powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1` — tout doit passer.
+5. **Builder et publier** : `.\build-zip.ps1` — génère `Arrivee-Collab_version<X>.zip` + `latest.json`, archive l'ancien zip dans `Archives\`, régénère `dist-ready\`, puis **commit + push automatiquement sur `origin` (GitHub)**. Le push EST la publication : dans les ~5 minutes, les apps voient la nouvelle version et affichent la pastille. Aucun transfert manuel.
+6. **Cas particulier — lanceur modifié** : si `dist-launcher/` a changé, le build produit un bundle `Arrivee-Collab-maj-<X>.zip` marqué « COMPLET » ; il faut alors reposer manuellement le nouveau `.cmd`/`bootstrap.ps1` aux endroits où les utilisateurs le double-cliquent (le bootstrap ne se met pas à jour tout seul). Bundle « minimal » = rien à faire.
+
+Ne jamais committer de fichiers sensibles : `Mot de passe/`, `Archive message/` et `*.msg` sont exclus par `.gitignore` (le dépôt est PUBLIC).
 
 ## Architecture
 
@@ -31,7 +44,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 ```
 ArriveeCollab-PS/          ← code source
   arrivee collab.ps1       ← script principal (~1156 lignes)
-  config.ps1               ← version de l'app + UpdateDir (URL OneDrive)
+  config.ps1               ← version de l'app + UpdateRepo (dépôt GitHub) + UpdateDir (repli OneDrive)
   releases.json            ← changelog versionné
   image-arrivee-collab.ico
   Resources/               ← images embarquées dans le mail (obligatoire)
@@ -91,7 +104,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 7. Nettoyage optionnel des fichiers temporaires
 8. Saisie des informations bénéficiaire (email, OU) → mise à jour de la note ServiceNow copiable
 
-**Mode « Mot de passe déjà initialisé »** (case `chkMdpDejaInit` cochée) : affiche un `DateTimePicker` (date d'initialisation), désactive la génération de mot de passe, et envoie un mail différent (`Get-CorpsMessageHTML_DejaInit_Final`) **sans PJ ZIP** indiquant que le compte possède déjà un mot de passe. Pas d'étape de vérification Mon-AD ni de nettoyage. La date est reportée dans l'en-tête de la note ServiceNow via `$global:CopyDateInit`.
+**Mode « Mot de passe déjà initialisé »** (case `chkMdpDejaInit` cochée) : Mon-AD n'affiche pas une date mais un **décompte** (« mot de passe défini il y a X jours »). L'utilisateur saisit donc ce nombre de jours dans `$txtJoursInit` (chiffres uniquement, flèches ↑/↓ pour ajuster) et l'app calcule la **date exacte** `aujourd'hui - X` affichée en temps réel dans `$lblDateCalc` — c'est cette date qui part dans le mail et la note. Ce mode désactive la génération de mot de passe et envoie un mail différent (`Get-CorpsMessageHTML_DejaInit_Final`) **sans PJ ZIP** indiquant que le compte possède déjà un mot de passe. Pas d'étape de vérification Mon-AD ni de nettoyage. La génération du .msg est bloquée si le décompte est vide ou invalide. La date est reportée dans l'en-tête de la note ServiceNow via `$global:CopyDateInit`.
 
 ### Fonctions clés
 
@@ -104,10 +117,12 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 | `Creer-FichierMsg` | Crée un .msg via COM Outlook |
 | `Attendre-FermetureOutlookEtDeplacer` | Lance un script PS en arrière-plan (max 30 tentatives, 2s d'intervalle) qui attend la libération du fichier .msg puis le déplace dans Archive |
 | `Get-CorpsMessageHTML_Preview` / `_Final` | Génère le HTML du mail standard (Preview inclut l'objet + cadre sombre, Final = mail brut envoyé) |
-| `Get-CorpsMessageHTML_DejaInit_Preview` / `_Final` | Variantes pour le mode « mot de passe déjà initialisé » (mail « Mouvement d'un Agent SNCF », mentionne la date d'init, pas de PJ) |
+| `Get-CorpsMessageHTML_DejaInit_Preview` / `_Final` | Variantes pour le mode « mot de passe déjà initialisé » (mail « Mouvement d'un Agent SNCF », mentionne la date d'init **calculée**, pas de PJ) |
 | `Show-AlertDialog` | Boîte de dialogue dark theme (simple OK ou Oui/Non avec textes personnalisables) |
 | `Show-BeneficiaireDialog` | Dialogue pour saisir l'email et l'OU du bénéficiaire. L'OU est une **liste déroulante** (`DropDownList`) figée de 9 entités SudEst (`$ouMap` : GaresEtConnexions, HEXAFRET, OPTIMSERVICES, SARESEAU, SASNCF, SAVOYAGEURS, SudAzur, SudMobilitesTechnologies, TECHNIS), chacune mappée vers un chemin `COMMUN.AD.SNCF.FR/Ressources_Locales/Bureautique/SudEst/.../Utilisateurs`. Sélection par défaut : `SudMobilitesTechnologies` (index 7) |
 | `Get-CopyBlockText` | Génère le texte de la note ServiceNow (affiché dans le panneau copiable). L'en-tête change selon `$global:CopyDateInit` |
+| `Get-DateInitSaisie` | Date d'initialisation (`dd/MM/yyyy`) déduite du décompte saisi ; `$null` si la saisie est vide ou invalide |
+| `Update-DateInitCalculee` | Rafraîchit l'étiquette de date calculée à droite du champ jours (violet si valide, `jj/mm/aaaa` rouge sinon) |
 | `Update-Preview` | Met à jour l'aperçu HTML et l'objet en temps réel à chaque modification des champs |
 | `Layout-FormPanel` | Recalcule le layout responsive du formulaire à chaque redimensionnement |
 
@@ -115,17 +130,17 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 
 | Classe | Rôle |
 |---|---|
-| `DarkTitleBar` | Active la barre de titre sombre Windows 10/11 via `DwmSetWindowAttribute` (dwmapi.dll), active le mode sombre système via `uxtheme.dll`, applique les scrollbars sombres, définit l'AppUserModelID (`SNCF.ArriveeCollaborateur`), et installe un `SetWinEventHook` (`HookCalendarPopup`) qui force le thème sombre sur les popups de calendrier (`SysMonthCal32` / `DropDown`) du `DateTimePicker` dès leur ouverture |
+| `DarkTitleBar` | Active la barre de titre sombre Windows 10/11 via `DwmSetWindowAttribute` (dwmapi.dll), active le mode sombre système via `uxtheme.dll`, applique les scrollbars sombres, définit l'AppUserModelID (`SNCF.ArriveeCollaborateur`), et installe un `SetWinEventHook` (`HookCalendarPopup`) qui force le thème sombre sur les popups (`SysMonthCal32` / `DropDown`, ex. la liste déroulante des OU) dès leur ouverture |
 
 ### Scripts secondaires
 
 - **`ArriveeCollab-PS/Start-ArriveeCollab.vbs`** / **`.cmd`** — Lanceurs locaux (développement) : exécutent le PS1 en mode fenêtre masquée, sans élévation UAC
-- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le OneDrive, installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
+- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le dépôt GitHub public (repli : dossier local du .cmd), installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
 - **`build-zip.ps1`** — Packaging : crée un zip versionné (`Arrivee-Collab_version<X>.zip`), génère `latest.json`, peuple `dist-ready/` avec les bundles complets, et tente un commit/push vers `origin`
-- **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`
+- **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`, `Should-AutoHide`, `ConvertTo-NombreDeJours` / `Get-DateDepuisJours` (décompte « il y a X jours » → date exacte, helpers purs testés hors-GUI)
 - **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`
-- **`lib/Update.ps1`** — détection MAJ, pastille, dialogues, self-update, Quoi de neuf
-- **`lib/Tutorial.ps1`** — tutoriel interactif data-driven (carte + surbrillance) : s'affiche automatiquement au premier lancement (~1,4 s après ouverture) et peut être rejoué à tout moment via le bouton « ? » en haut à droite. Versionné (`$script:TutorialVersion`) ; 10 étapes définies dans `Get-TutorialSteps`, état persisté dans `state.json` (`TutorialSeen` / `TutorialSeenVersion`)
+- **`lib/Update.ps1`** — détection MAJ (GitHub raw en canal principal, dossier OneDrive en repli), pastille, dialogues, self-update, Quoi de neuf
+- **`lib/Tutorial.ps1`** — tutoriel interactif data-driven (carte + surbrillance) : s'affiche automatiquement au premier lancement (~1,4 s après ouverture) et peut être rejoué à tout moment via le bouton « ? » en haut à droite. Versionné (`$script:TutorialVersion`) ; 14 étapes définies dans `Get-TutorialSteps`, état persisté dans `state.json` (`TutorialSeen` / `TutorialSeenVersion`)
 
 ### Dossiers
 

@@ -7,7 +7,7 @@
 # Version du CONTENU du tutoriel. À INCRÉMENTER à chaque modification de
 # Get-TutorialSteps : un utilisateur ayant vu une version plus ancienne le revoit
 # une fois au lancement (bouton « Passer » disponible).
-$script:TutorialVersion = 5
+$script:TutorialVersion = 6
 
 # Étapes data-driven. Icon = caractère (ConvertFromUtf32, robuste à l'encodage).
 # Target = scriptblock renvoyant le contrôle à encadrer (ou $null pour une carte centrée).
@@ -24,7 +24,7 @@ function Get-TutorialSteps {
            Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères, le copie dans le presse-papiers et prépare un fichier .zip protégé à joindre au mail."
            Target = { $btnGenPwd } }
         @{ Icon = ([char]::ConvertFromUtf32(0x26A0)); Title = 'Mot de passe déjà initialisé'
-           Text  = "Si le compte possède déjà un mot de passe, cochez cette case : indiquez la date d'initialisation, et l'outil enverra un mail différent (sans pièce jointe) au lieu d'en générer un nouveau."
+           Text  = "Si le compte possède déjà un mot de passe, cochez cette case. Mon-AD affiche un décompte (« il y a X jours ») : saisissez simplement ce nombre de jours, l'outil calcule et affiche la date exacte correspondante. Vous pouvez aussi l'ajuster avec les flèches ↑ et ↓. L'outil enverra alors un mail différent (sans pièce jointe) au lieu de générer un nouveau mot de passe."
            Target = { $chkMdpDejaInit } }
         @{ Icon = ([char]::ConvertFromUtf32(0x2705)); Title = 'Vérifications avant envoi'
            Text  = "Avant de générer le .msg, l'outil vous demande de confirmer que vous avez bien modifié le mot de passe dans Mon-AD et déplacé le compte dans la bonne OU."
@@ -51,7 +51,7 @@ function Get-TutorialSteps {
            Text  = "Ce bouton aspire la fenêtre dans une petite bulle ronde posée sur le bord de l'écran. Cliquez la bulle pour faire réapparaître l'app, glissez-la pour la déplacer (elle s'aimante au bord gauche ou droit), ou clic droit pour fermer l'outil."
            Target = { $btnHide } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F9F2)); Title = 'Masquage automatique'
-           Text  = "Plus besoin de cliquer : dès que vous basculez vers une autre application, l'outil se replie tout seul dans cette bulle pour rester visible sans vous gêner. Cliquez la bulle pour le ramener. Pendant la création du .msg (et son ouverture dans Outlook), l'app reste affichée pour vous laisser terminer."
+           Text  = "Plus besoin de cliquer : dès que vous basculez vers une autre application, l'outil se replie tout seul dans cette bulle pour rester visible sans vous gêner. Cliquez la bulle pour le ramener. Pendant la création du .msg (et son ouverture dans Outlook), l'app reste affichée pour vous laisser terminer. Vous préférez garder la fenêtre affichée en permanence ? Décochez la case « Réduction auto en bulle » (en haut à droite, sous les images) — aussi accessible par clic droit sur ce bouton ou sur la bulle. Le choix est mémorisé."
            Target = { $btnHide } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F389)); Title = "C'est parti !"
            Text  = "Vous êtes prêt. Les mises à jour de l'outil vous présenteront automatiquement les nouveautés. Vous pouvez rejouer ce tutoriel à tout moment via le bouton « ? » en haut à droite."

@@ -68,6 +68,36 @@ function Enable-ClipboardHistory {
     }
 }
 
+# ----------------------------------------------------------------------------
+#  Mode « mot de passe déjà initialisé » : Mon-AD n'affiche pas une date mais un
+#  décompte (« mot de passe défini il y a X jours »). L'opérateur saisit ce X et
+#  l'outil en déduit la date exacte (aujourd'hui - X), seule valeur reportée dans
+#  le mail et la note ServiceNow. Helpers purs => testables hors-GUI.
+# ----------------------------------------------------------------------------
+
+# Normalise une saisie libre en nombre de jours.
+# Renvoie $null si ce n'est pas un entier positif ou s'il dépasse $Max (~10 ans),
+# sinon l'entier correspondant. La GUI s'en sert à la fois pour l'aperçu en
+# temps réel et pour bloquer la génération du .msg sur une saisie invalide.
+function ConvertTo-NombreDeJours {
+    param([string]$Texte, [int]$Max = 3650)
+    if ($null -eq $Texte) { return $null }
+    $t = $Texte.Trim()
+    if ($t -eq '') { return $null }
+    if ($t -notmatch '^\d+$') { return $null }
+    if ($t.Length -gt 9) { return $null }   # évite un dépassement de [int]
+    $n = [int]$t
+    if ($n -gt $Max) { return $null }
+    return $n
+}
+
+# Date exacte correspondant à « il y a $Jours jours », à minuit (sans heure).
+# $Reference est injectable pour rendre le calcul testable indépendamment du jour.
+function Get-DateDepuisJours {
+    param([int]$Jours, [datetime]$Reference = (Get-Date))
+    return $Reference.Date.AddDays(-$Jours)
+}
+
 # --- Journalisation (fichier uniquement, jamais la console) ---
 $script:AppLogPath = $null
 
@@ -92,7 +122,8 @@ function Write-AppLog {
 #  Décision pure : faut-il replier l'app en bulle quand elle perd le focus ?
 #  Vrai uniquement si la fenêtre désormais au premier plan appartient à un
 #  AUTRE processus (et qu'on n'est ni déjà masqué, ni en animation, ni dans
-#  le flux de génération du .msg où le masquage est volontairement suspendu).
+#  le flux de génération du .msg où le masquage est volontairement suspendu,
+#  ni avec la préférence utilisateur « garder la fenêtre affichée » active).
 #  Extrait en fonction testable : la logique est ainsi couverte hors-GUI.
 # ----------------------------------------------------------------------------
 function Should-AutoHide {
@@ -101,8 +132,10 @@ function Should-AutoHide {
         [bool]$Animating,
         [bool]$Suppressed,
         [int]$ForegroundPid,
-        [int]$OwnPid
+        [int]$OwnPid,
+        [bool]$Disabled = $false
     )
+    if ($Disabled)                  { return $false }
     if ($Suppressed)                { return $false }
     if ($AppHidden)                 { return $false }
     if ($Animating)                 { return $false }

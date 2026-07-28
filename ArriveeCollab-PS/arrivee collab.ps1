@@ -648,7 +648,6 @@ $form.Add_Shown({
         [DarkTitleBar]::ApplyDarkScrollbar($panelActions.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($rtbCopy.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($rtbMsg.Handle)
-        [DarkTitleBar]::ApplyDarkScrollbar($dtpDateInit.Handle)
     } catch {}
 })
 
@@ -788,7 +787,24 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
     $lblStatusImg.Text = "Vérifier les images !"; $lblStatusImg.ForeColor = $cDanger
 }
 
-# Ligne 3 : Checkbox mot de passe déjà initialisé + DateTimePicker
+# Case à cocher VISIBLE de la préférence « réduction automatique en bulle » (la même
+# option que le clic droit sur « » » / sur la bulle, plus explicite). Cochée = l'app
+# se replie en bulle à la perte de focus ; décochée = elle reste affichée. Synchronisée
+# dans les deux sens avec les menus contextuels via Set-AutoHideDisabled.
+$chkAutoBulle = New-Object Windows.Forms.CheckBox
+$chkAutoBulle.Text = "Réduction auto en bulle"
+$chkAutoBulle.Location = New-Object Drawing.Point(830, 100)
+$chkAutoBulle.Size = New-Object Drawing.Size(200, 28)
+$chkAutoBulle.ForeColor = $cTextSecondary
+$chkAutoBulle.BackColor = $cBgSecondary
+$chkAutoBulle.Font = [Drawing.Font]::new("Segoe UI", 9)
+$chkAutoBulle.FlatStyle = 'Flat'
+$chkAutoBulle.Cursor = [Windows.Forms.Cursors]::Hand
+$chkAutoBulle.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$chkAutoBulle.Checked = -not [bool]$global:Ctx.State.AutoHideDisabled
+$chkAutoBulle.Add_CheckedChanged({ Set-AutoHideDisabled (-not $chkAutoBulle.Checked) })
+
+# Ligne 3 : Checkbox mot de passe déjà initialisé + décompte « il y a X jours »
 $chkMdpDejaInit = New-Object Windows.Forms.CheckBox
 $chkMdpDejaInit.Text = "  Mot de passe déjà initialisé"
 $chkMdpDejaInit.Appearance = 'Button'
@@ -805,33 +821,72 @@ $chkMdpDejaInit.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(60
 $chkMdpDejaInit.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
 $chkMdpDejaInit.Cursor = [Windows.Forms.Cursors]::Hand
 
+# Mon-AD n'affiche pas une date d'initialisation mais un décompte
+# (« mot de passe défini il y a X jours ») : on saisit donc ce nombre de jours,
+# et l'outil en déduit la date exacte (aujourd'hui - X), affichée juste à côté.
+# C'est cette date calculée qui part dans le mail et la note ServiceNow.
 $lblDateInit = New-Object Windows.Forms.Label
-$lblDateInit.Text = "Date d'initialisation :"
+$lblDateInit.Text = "Initialisé il y a :"
 $lblDateInit.AutoSize = $true
 $lblDateInit.Location = New-Object Drawing.Point($col2Lbl, 98)
 $lblDateInit.ForeColor = $cTextSecondary
 $lblDateInit.Visible = $false
 
-$dtpDateInit = New-Object Windows.Forms.DateTimePicker
-$dtpDateInit.Location = New-Object Drawing.Point($col2In, 95)
-$dtpDateInit.Width = $inW
-$dtpDateInit.Format = 'Custom'
-$dtpDateInit.CustomFormat = 'dd/MM/yyyy'
-$dtpDateInit.Font = [Drawing.Font]::new("Segoe UI", 10)
-$dtpDateInit.BackColor = $cSurface
-$dtpDateInit.ForeColor = $cTextPrimary
-$dtpDateInit.CalendarMonthBackground = $cSurface
-$dtpDateInit.CalendarForeColor = $cTextPrimary
-$dtpDateInit.CalendarTitleBackColor = $cAccentViolet
-$dtpDateInit.CalendarTitleForeColor = $cWhite
-$dtpDateInit.CalendarTrailingForeColor = $cTextSecondary
-$dtpDateInit.Visible = $false
+$txtJoursInit = New-Object Windows.Forms.TextBox
+$txtJoursInit.Location = New-Object Drawing.Point($col2In, 95)
+$txtJoursInit.Width = 60
+$txtJoursInit.Text = "0"
+$txtJoursInit.MaxLength = 4
+$txtJoursInit.TextAlign = 'Center'
+$txtJoursInit.BackColor = $cSurface; $txtJoursInit.ForeColor = $cTextPrimary
+$txtJoursInit.BorderStyle = 'FixedSingle'; $txtJoursInit.Font = [Drawing.Font]::new("Segoe UI", 10)
+$txtJoursInit.Visible = $false
+
+$lblJoursUnite = New-Object Windows.Forms.Label
+$lblJoursUnite.Text = "jours  ="
+$lblJoursUnite.AutoSize = $true
+$lblJoursUnite.Location = New-Object Drawing.Point(($col2In + 68), 98)
+$lblJoursUnite.ForeColor = $cTextSecondary
+$lblJoursUnite.Visible = $false
+
+# Date calculée : LA valeur à reporter dans Mon-AD / la note. Mise en évidence
+# en violet ; passe en rouge avec un gabarit si la saisie n'est pas exploitable.
+$lblDateCalc = New-Object Windows.Forms.Label
+$lblDateCalc.AutoSize = $true
+$lblDateCalc.Location = New-Object Drawing.Point(($col2In + 130), 97)
+$lblDateCalc.ForeColor = $cAccentViolet
+$lblDateCalc.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+$lblDateCalc.Visible = $false
+
+# Date d'initialisation déduite de la saisie, au format dd/MM/yyyy.
+# $null si le nombre de jours saisi est vide ou invalide (la génération du .msg
+# s'appuie dessus pour bloquer avec un message clair).
+function Get-DateInitSaisie {
+    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text
+    if ($null -eq $jours) { return $null }
+    return (Get-DateDepuisJours $jours).ToString('dd/MM/yyyy')
+}
+
+# Rafraîchit l'étiquette de date calculée affichée à droite du champ.
+function Update-DateInitCalculee {
+    $d = Get-DateInitSaisie
+    if ($d) {
+        $lblDateCalc.Text = $d
+        $lblDateCalc.ForeColor = $cAccentViolet
+    } else {
+        $lblDateCalc.Text = "jj/mm/aaaa"
+        $lblDateCalc.ForeColor = $cDanger
+    }
+}
 
 $chkMdpDejaInit.Add_CheckedChanged({
     $checked = $chkMdpDejaInit.Checked
     $lblDateInit.Visible = $checked
-    $dtpDateInit.Visible = $checked
+    $txtJoursInit.Visible = $checked
+    $lblJoursUnite.Visible = $checked
+    $lblDateCalc.Visible = $checked
     if ($checked) {
+        Update-DateInitCalculee
         $chkMdpDejaInit.ForeColor = $cWhite
         $btnGenPwd.Enabled = $false
         $btnGenPwd.BackColor = $cBorder
@@ -848,9 +903,30 @@ $chkMdpDejaInit.Add_CheckedChanged({
     Update-Preview
 })
 
-$dtpDateInit.Add_ValueChanged({ Update-Preview })
+# Saisie : uniquement des chiffres (les autres touches sont ignorées à la source,
+# on ne peut donc pas taper une valeur non exploitable).
+$txtJoursInit.Add_KeyPress({
+    param($s, $e)
+    if (-not ([char]::IsControl($e.KeyChar) -or [char]::IsDigit($e.KeyChar))) { $e.Handled = $true }
+})
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$dtpDateInit,$picHeader,$picSignature,$lblStatusImg))
+# Flèches ↑ / ↓ pour ajuster le décompte au clavier (confort de l'ancien calendrier).
+$txtJoursInit.Add_KeyDown({
+    param($s, $e)
+    if ($e.KeyCode -ne [Windows.Forms.Keys]::Up -and $e.KeyCode -ne [Windows.Forms.Keys]::Down) { return }
+    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text
+    if ($null -eq $jours) { $jours = 0 }
+    if ($e.KeyCode -eq [Windows.Forms.Keys]::Up) { $jours++ } elseif ($jours -gt 0) { $jours-- }
+    $txtJoursInit.Text = "$jours"
+    $txtJoursInit.SelectionStart = $txtJoursInit.Text.Length
+    $e.Handled = $true
+    $e.SuppressKeyPress = $true
+})
+
+$txtJoursInit.Add_TextChanged({ Update-DateInitCalculee; Update-Preview })
+Update-DateInitCalculee
+
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -870,6 +946,12 @@ function Layout-FormPanel {
     $lblEmail.Left = $c2x
     $txtEmail.Left = $c2x + $labelW
     $txtEmail.Width = $inW
+
+    # Ligne 3, colonne 2 : décompte de jours + date calculée, alignés sur l'e-mail.
+    $lblDateInit.Left = $c2x
+    $txtJoursInit.Left = $c2x + $labelW
+    $lblJoursUnite.Left = $txtJoursInit.Right + 8
+    $lblDateCalc.Left = $lblJoursUnite.Right + 8
 }
 $panelForm.Add_Resize({ Layout-FormPanel })
 Layout-FormPanel
@@ -932,6 +1014,7 @@ $btnReset.Add_Click({
     $txtNomPrenom.Text = ""
     $txtPwd.Text = ""
     $chkMdpDejaInit.Checked = $false
+    $txtJoursInit.Text = "0"
     $btnGenPwd.Enabled = $true
     $btnGenPwd.BackColor = $cAccentViolet
     $txtPwd.BackColor = $cSurface
@@ -1251,7 +1334,9 @@ function Update-Preview {
     $ritm = if($txtRITM.Text){$txtRITM.Text}else{"RITMXXXXX"}
     $nomPrenom = if($txtNomPrenom.Text){$txtNomPrenom.Text}else{"Prénom NOM"}
     if ($chkMdpDejaInit.Checked) {
-        $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
+        # Décompte non exploitable : l'aperçu montre un gabarit plutôt qu'une fausse date.
+        $dateInit = Get-DateInitSaisie
+        if (-not $dateInit) { $dateInit = "jj/mm/aaaa" }
         $objet = "$ritm - Mot de passe déjà initialisé $nomPrenom"
         $txtSubjectPreview.Text = $objet
         $html = Get-CorpsMessageHTML_DejaInit_Preview $objet $nomPrenom $dateInit $cheminHeader $cheminSignature
@@ -1291,7 +1376,12 @@ $btnGenMsg.Add_Click({
 
     if ($chkMdpDejaInit.Checked) {
         # --- Mode : mot de passe déjà initialisé ---
-        $dateInit = $dtpDateInit.Value.ToString("dd/MM/yyyy")
+        # Date envoyée = date du jour moins le décompte saisi (valeur lue dans Mon-AD).
+        $dateInit = Get-DateInitSaisie
+        if (-not $dateInit) {
+            Show-AlertDialog -message "Indiquez depuis combien de jours le mot de passe est initialisé (nombre entier de jours, tel qu'affiché dans Mon-AD)." -title "Erreur"
+            return
+        }
         $objet = "$ritm - Mot de passe déjà initialisé $nomPrenom"
         $htmlFinal = Get-CorpsMessageHTML_DejaInit_Final $nomPrenom $dateInit $cheminHeader $cheminSignature
         $htmlPreview = Get-CorpsMessageHTML_DejaInit_Preview $objet $nomPrenom $dateInit $cheminHeader $cheminSignature
@@ -1394,6 +1484,10 @@ $form.Add_Shown({
 $global:AppHidden = $false
 # Drapeau : suspend le masquage automatique pendant le flux de génération du .msg.
 $global:SuppressAutoHide = $false
+# Préférence UTILISATEUR : ne pas replier en bulle à la perte de focus (la fenêtre
+# reste visible sur le côté). Basculable par clic droit sur « » » ou sur la bulle ;
+# persistée dans state.json. Le masquage MANUEL (clic sur « » ») reste possible.
+$global:AutoHideDisabled = [bool]$global:Ctx.State.AutoHideDisabled
 # Dernière position de la bulle ($null = jamais déplacée => position par défaut).
 $global:BubbleLastPos = $null
 # Position d'apparition résolue au masquage + bounds pleins de l'app (pour l'animation).
@@ -1700,6 +1794,8 @@ $btnHide.Add_Click({ Hide-App })
 #  mono-coup de 200 ms laisse le nouveau premier plan se stabiliser ; on ne
 #  masque que si sa fenêtre appartient à un autre processus (cf. Should-AutoHide,
 #  lib/Common.ps1). Couvre ainsi dialogues, popup calendrier, tutoriel, bulle.
+#  Désactivable via l'option « Réduction automatique en bulle » (clic droit sur
+#  le bouton « » » ou sur la bulle) — voir Set-AutoHideDisabled plus bas.
 # ============================================================================
 $timerAutoHide = New-Object Windows.Forms.Timer
 $timerAutoHide.Interval = 200
@@ -1708,12 +1804,12 @@ $timerAutoHide.Add_Tick({
     $h = [Win32.Fg]::GetForegroundWindow()
     $fgPid = [uint32]0
     if ($h -ne [IntPtr]::Zero) { [void][Win32.Fg]::GetWindowThreadProcessId($h, [ref]$fgPid) }
-    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID) {
+    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID -Disabled $global:AutoHideDisabled) {
         Hide-App
     }
 }.GetNewClosure())
 $form.Add_Deactivate({
-    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide) { return }
+    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide -or $global:AutoHideDisabled) { return }
     $timerAutoHide.Stop(); $timerAutoHide.Start()
 }.GetNewClosure())
 # (le clic simple sur la bulle est géré par MouseUp ci-dessus : tap = afficher, glisser = déplacer)
@@ -1730,6 +1826,37 @@ $miClose = $bubbleMenu.Items.Add("Fermer l'application")
 $miClose.add_Click({ $global:AppHidden = $false; $bubble.Hide(); $form.Close() })
 $bubble.ContextMenuStrip = $bubbleMenu
 $picBubble.ContextMenuStrip = $bubbleMenu
+
+# ============================================================================
+#  Option « Réduction automatique en bulle » : certains collègues préfèrent garder
+#  la fenêtre visible sur le côté en travaillant dans une autre application. Item
+#  COCHABLE accessible par clic droit sur le bouton « » » ET sur la bulle ; décoché,
+#  l'app ne se replie plus à la perte de focus (le repli manuel via « » » reste
+#  possible). Préférence persistée dans state.json (auto_hide_disabled).
+# ============================================================================
+function Set-AutoHideDisabled([bool]$Disabled) {
+    $global:AutoHideDisabled = $Disabled
+    $global:Ctx.State.AutoHideDisabled = $Disabled
+    # Reflète l'état sur la case à cocher du formulaire (assigner une valeur identique
+    # ne re-déclenche pas CheckedChanged : pas de boucle).
+    try { $chkAutoBulle.Checked = -not $Disabled } catch { }
+    try { Save-AppState $global:Ctx.State } catch { }
+}
+$hideMenu = New-Object Windows.Forms.ContextMenuStrip
+$hideMenu.BackColor = $cBgSecondary
+$hideMenu.ForeColor = $cTextPrimary
+$hideMenu.ShowImageMargin = $false
+$hideMenu.ShowCheckMargin = $true
+$miAutoHideBtn = $hideMenu.Items.Add("Réduction automatique en bulle")
+$miAutoHideBtn.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
+$hideMenu.add_Opening({ $miAutoHideBtn.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
+$btnHide.ContextMenuStrip = $hideMenu
+
+$bubbleMenu.ShowCheckMargin = $true
+[void]$bubbleMenu.Items.Add((New-Object Windows.Forms.ToolStripSeparator))
+$miAutoHideBub = $bubbleMenu.Items.Add("Réduction automatique en bulle")
+$miAutoHideBub.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
+$bubbleMenu.add_Opening({ $miAutoHideBub.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
 
 $form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
 
