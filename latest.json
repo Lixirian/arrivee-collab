@@ -1,11 +1,11 @@
 ﻿{
-    "version":  "1.13.1",
-    "zip":  "Arrivee-Collab_version1.13.1.zip",
-    "sha256":  "B789AF52857554768C0EB746A48F862C8AAA319465F1203A6F3B097335D8D88A",
-    "sig":  "it/voBRTkvVAaKt3cKUSlhw8KnNmk0VCiuqOSu8YcazCZGNMwsw/dp/8UaDx2zoUMiPASRBo2fmEsKIVKg69W6Ul61xyGXhi2WRl4w80WHs2uBSDE2XjguXkDlb5YHkIs1pDgnSiMcH4MC3xvYEuSI5SyL1aT4EAWdIMKKMNQ+aWT+ghKyzG6KTJzhBdrKw1W654BE4XUAXI9055WL/eCdn3b54UB3d5t5vK9gTtnpOQJz++C2G59cwTFwyNvvpShfcR+S4JLTet6/aY0a1H3XiLZVMoVewwY3Xen8Wc1uTwZNjTrVUDGh1qG6NDdLp6U+wu+GfNDRTLUrYl0Nqykl3836bqcO/7+shk+9ul0oMgwSACxh0Gu5X+6AYUbtD0+5NzmiabhmSa0QJ2t0zurT0hw7V2PS/M1uPL6DlDijE+KCexiWHQ2nVMVRhOI47CFCW6IrZj6mBpCSotLxy0LO3LBGwmbhdH+g7qhsZw+WToxsH37Gdg53rO1HP1+GAA",
-    "msig":  "FyiKARenTudvRW3n0ilajncXw1EOJbqd2UeEXuE6pWcOLxRmObWbCvuGjRfw5rwuMNr5P6sCajhMLk/Fq5uHkcOWZkCxsfRh1IkW4ezP4Y6rse+wjxeRQ1gZMtcpVCo42tSHEINU1wca5Bnu35sgePBmC/BhLwAo+7Al8gzk3+VcsY+gm5najowxo1P+P8qctyZxzEp+93MAjHwRJBihAN1waV3lsokdz2mL0BwL2buYjhMl6MlND2MU+FKP0H5dNprBVnphMXh+AG7os+jLP+CRk60sBAc7UTnrVa4Wx2ZXrANxSDznXguPiTxPbK/DPhOACVajpdF2DlLT8D7aTueOkfsor1HWESELhLXZ0QNPr1VA/sWkaAB0/wTTFwChiwXarsQ9MRqRL+dxJ8grkBB8+Ra23e0jzi1RE7FsWoiebceb10jLJSnkIdtIu3QeQAPz8t509X4/Z8OY34fWots++4hLpIWqskXaVJipWzIuH07aAm6CXAgvF3OsCytg",
+    "version":  "1.13.2",
+    "zip":  "Arrivee-Collab_version1.13.2.zip",
+    "sha256":  "F5F212E8F312B154C03EA4542AE583EB02DEE33F12BD1D6D3AF51BFE0877074E",
+    "sig":  "OeYhWfcSScy6nIoHlIxdgK8RlDISbBSN2U5DrfmvuoKcXUSS0O8xFEGUqGmHokqNXFRFJZaHxJ5qZ3UyRtGhEycNW7itN+ctPnWqvcoFY4NtiX0vVBQ5UJ/f8J8OtMIlMxda4G+kKgQH/FAdLL3jRrErqbZ+KtkGb8q0igyIZfXUgBfiu/b4QPo1oKbE1H29YXa1jWSCrjcDXjE4B+yf8YKt0IsVs3HKooUeGzDu4AbE952U84AyJt3Iwojv/lP8kqsOYVy2XNnC0hpKo5Q53mTwcrz8RdBqFJOsyAH1nIpvukjwjEz5y3If9clMFwD2Ugo255vGrJTMfwd24psipjtkf5pAS7vSs/JiSEl+8jHmmWXBOryn4xSnbPmxbdUsBFRzLCIzALFo21T38KGZcXcFwmAkgnqMBH4KMrwH6FFFbai85j6uqp4BJdwDke9htobsNbS/n97Xz6NOC4StTokweCat1/ZeNbnUQw8lFcwbWy8f1xftAq1v5HKrTqqg",
+    "msig":  "m99VfrpN3CHDq24yqJ7eHvNziI+TeTuFTghwV8ToPoYgBYvHgvro59es2bNhETn8SI3zd0p2oUEIft4ocH9VZ8wCUn8SuHu/v9OtOnbJJIPI+6cSB5UTSuUl/KrECf7y4fYHOMLCKXxUvYKuheJsKohxGCSvjk5x5SlRTwXGgc6CkJ18JmQWr+uPAhuNrJAJJnQmi2n+Mk8RKKFU+gVFrQzhuQzmEohAcSQv0WqWahAfpb19FM4AK8l1/L/6qqw4SWFsWrYXjIF9A69xGyJx+zpy/ll1QoaxaTI9MLIAqiWbqCrCkp4wGIPgZnq9rIktPcwBaKzliyfGq03HLrW7/V/pnbSvjE2uLkN0nGdRQ+vVfjGxLbBAyaPi5lHSYNEjeaQN98Bn4+8+4gDbilBq4pak+Y2I6o5BuJWg1F4TEZgfVZPKx2Pw0IlmzrLnlpfTwePDWxCx7OualJrAtu9zgo96Spyuh/22v1mKmp72eVktzk+nV2hCowbdX0mzwgwR",
     "date":  "2026-10-27",
     "notes":  [
-                  "Détection des doublons affinée : seule une autre demande ENCORE EN COURS, pour le même bénéficiaire et le même motif (même tâche, par exemple « Support Site Arrivée »), est signalée comme doublon, quel qu\u0027en soit le demandeur. Une demande déjà réalisée (arrivée précédente, changement de statut…) ou d\u0027un autre motif n\u0027est plus signalée."
+                  "Lanceur en un seul fichier : « Arrivee Collab.cmd » fonctionne désormais seul, posé n\u0027importe où (bureau, dossier OneDrive…), sans fichier .vbs ni bootstrap.ps1 à côté. Corrige l\u0027erreur « Impossible de trouver le fichier script … Arrivee Collab.vbs » au lancement depuis un autre poste."
               ]
 }

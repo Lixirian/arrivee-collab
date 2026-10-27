@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` (copié depuis `dist-launcher/`, posé n'importe où — dossier OneDrive partagé, bureau…). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` — **fichier unique** (comme `Biblio-Tech.cmd`), copié depuis `dist-launcher/` ou `dist-ready/`, posé **seul** n'importe où (dossier OneDrive partagé, bureau…), sans .vbs ni bootstrap.ps1 à côté. Il est **généré par `build-zip.ps1`** : en-tête batch (`AC_SELF=%~f0`, PowerShell masqué qui relit le .cmd et exécute ce qui suit le marqueur `##ARRIVEECOLLAB-PS##`) + `dist-launcher/bootstrap.ps1` tel quel — ne jamais éditer le .cmd à la main, modifier `bootstrap.ps1` (où `$dist` = dossier du .cmd via `$env:AC_SELF`, `$PSScriptRoot` étant vide). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version.
 
 ## Publier une mise à jour (démarche OBLIGATOIRE pour toute évolution)
 
@@ -58,10 +58,9 @@ ArriveeCollab-PS/          ← code source
     Common.ps1             ← chemins data, log, Compare-AppVersion, Write-AppLog
     State.ps1              ← state.json, migration de version
 
-dist-launcher/             ← fichiers à poser sur le OneDrive de distribution
-  Arrivee Collab.cmd       ← point d'entrée utilisateur final
-  Arrivee Collab.vbs
-  bootstrap.ps1            ← première installation de l'app sous %LOCALAPPDATA%
+dist-launcher/             ← lanceur
+  Arrivee Collab.cmd       ← FICHIER UNIQUE distribué (GÉNÉRÉ par build-zip.ps1 = en-tête + bootstrap.ps1)
+  bootstrap.ps1            ← source du lanceur (première installation sous %LOCALAPPDATA%), non distribué seul
   LISEZMOI.txt
 
 build-zip.ps1              ← packaging : zip versionné + latest.json + dist-ready/
@@ -147,7 +146,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 ### Scripts secondaires
 
 - **`ArriveeCollab-PS/Start-ArriveeCollab.vbs`** / **`.cmd`** — Lanceurs locaux (développement) : exécutent le PS1 en mode fenêtre masquée, sans élévation UAC
-- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution : télécharge le zip versionné depuis le dépôt GitHub public (repli : dossier local du .cmd), installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
+- **`dist-launcher/bootstrap.ps1`** — Bootstrap de distribution (embarqué dans `Arrivee Collab.cmd` par le build) : télécharge le zip versionné depuis le dépôt GitHub public (repli : dossier local du .cmd), installe l'app sous `%LOCALAPPDATA%\Arrivee-Collab\app\`, puis lance `Start-ArriveeCollab.vbs`
 - **`build-zip.ps1`** — Packaging : crée un zip versionné (`Arrivee-Collab_version<X>.zip`), génère `latest.json`, peuple `dist-ready/` avec les bundles complets, et tente un commit/push vers `origin`
 - **`lib/Common.ps1`** — Fonctions partagées : `Get-AppDataDir`, `Get-AppWorkDir`, `Compare-AppVersion`, `Write-AppLog`, `Initialize-AppLog`, `Should-AutoHide`, `ConvertTo-NombreDeJours` / `Get-DateDepuisJours` (décompte « il y a X jours » → date exacte, helpers purs testés hors-GUI)
 - **`lib/State.ps1`** — Gestion de `state.json` : `New-AppState`, `Save-AppState`, `Invoke-AppVersionMigration`

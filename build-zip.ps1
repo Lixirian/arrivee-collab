@@ -216,12 +216,38 @@ Get-ChildItem -LiteralPath $repo -Filter 'Arrivee-Collab_version*.zip' |
     Where-Object { $_.Name -ne "$name.zip" } |
     ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination $arch -Force; $moved += $_.Name }
 
-# Assemble dist-ready\ : lanceur + zip courant + latest.json.
+# « Arrivee Collab.cmd » : FICHIER UNIQUE (comme Biblio-Tech.cmd). En-tête batch ASCII
+# qui relit le fichier et exécute, fenêtre masquée, le PowerShell placé après le
+# marqueur = dist-launcher\bootstrap.ps1 tel quel. UTF-8 SANS BOM (cmd ne lit pas le
+# BOM), fins de ligne CRLF. Chemin du .cmd passé par variable d'environnement (AC_SELF) :
+# aucun souci de guillemets/apostrophes dans le chemin.
+$cmdHeader = @'
+@echo off
+REM ============================================================
+REM  Arrivee Collaborateur - UN SEUL FICHIER : double-cliquer.
+REM  Installe la derniere version signee depuis GitHub (premiere
+REM  installation) puis lance l'application. Les mises a jour
+REM  suivantes passent par la pastille de l'application.
+REM  Fichier GENERE par build-zip.ps1 (dist-launcher\bootstrap.ps1).
+REM ============================================================
+setlocal
+set "AC_SELF=%~f0"
+start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$s=[IO.File]::ReadAllText($env:AC_SELF,[Text.Encoding]::UTF8); $i=$s.IndexOf('#'+'#ARRIVEECOLLAB-PS#'+'#'); & ([ScriptBlock]::Create($s.Substring($i)))"
+exit /b
+##ARRIVEECOLLAB-PS##
+'@
+$bsText = [IO.File]::ReadAllText((Join-Path $repo 'dist-launcher\bootstrap.ps1'), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
+$cmdText = (($cmdHeader.TrimEnd() + "`n" + $bsText) -replace "`r`n", "`n") -replace "`n", "`r`n"
+[IO.File]::WriteAllText((Join-Path $repo 'dist-launcher\Arrivee Collab.cmd'), $cmdText, (New-Object System.Text.UTF8Encoding $false))
+
+# Assemble dist-ready\ : lanceur (.cmd unique + LISEZMOI) + zip courant + latest.json.
+# bootstrap.ps1 = source du .cmd, non distribué ; l'ancien lanceur en 3 fichiers est retiré.
 $ready = Join-Path $repo 'dist-ready'
 if (-not (Test-Path -LiteralPath $ready)) { New-Item -ItemType Directory -Path $ready -Force | Out-Null }
 Get-ChildItem -LiteralPath $ready -Filter 'Arrivee-Collab_version*.zip' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -ne "$name.zip" } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
-Copy-Item -Path (Join-Path $repo 'dist-launcher\*') -Destination $ready -Recurse -Force
+foreach ($old in @('bootstrap.ps1', 'Arrivee Collab.vbs')) { Remove-Item -LiteralPath (Join-Path $ready $old) -Force -ErrorAction SilentlyContinue }
+Copy-Item -Path (Join-Path $repo 'dist-launcher\*') -Destination $ready -Recurse -Force -Exclude 'bootstrap.ps1'
 Copy-Item -LiteralPath $zip -Destination $ready -Force
 Copy-Item -LiteralPath (Join-Path $repo 'latest.json') -Destination $ready -Force
 

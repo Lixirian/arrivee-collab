@@ -1,4 +1,7 @@
 ﻿{
+    "1.13.2": [
+        "Lanceur en un seul fichier : « Arrivee Collab.cmd » fonctionne désormais seul, posé n'importe où (bureau, dossier OneDrive…), sans fichier .vbs ni bootstrap.ps1 à côté. Corrige l'erreur « Impossible de trouver le fichier script … Arrivee Collab.vbs » au lancement depuis un autre poste."
+    ],
     "1.13.1": [
         "Détection des doublons affinée : seule une autre demande ENCORE EN COURS, pour le même bénéficiaire et le même motif (même tâche, par exemple « Support Site Arrivée »), est signalée comme doublon, quel qu'en soit le demandeur. Une demande déjà réalisée (arrivée précédente, changement de statut…) ou d'un autre motif n'est plus signalée."
     ],

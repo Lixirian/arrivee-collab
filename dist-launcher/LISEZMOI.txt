@@ -1,27 +1,25 @@
-Arrivee Collaborateur - Dossier de distribution (OneDrive)
-==========================================================
+Arrivee Collaborateur - Lanceur
+===============================
 
-CONTENU A METTRE DANS CE DOSSIER (acces LECTURE SEULE pour l'equipe) :
-  - latest.json                      (genere par build-zip.ps1 : version + zip + notes)
-  - Arrivee-Collab_version<X>.zip     (le ou les zips versionnes)
-  - Arrivee Collab.cmd + Arrivee Collab.vbs + bootstrap.ps1   (le lanceur)
+UN SEUL FICHIER A DISTRIBUER : "Arrivee Collab.cmd"
+  A poser n'importe ou (bureau, dossier OneDrive, partage...), seul.
+  Aucun autre fichier n'est necessaire a cote (ni .vbs, ni bootstrap.ps1).
 
 UTILISATION (cote utilisateur)
-  Lancer "Arrivee Collab.cmd" (ou un raccourci vers lui). Le lanceur :
-    1. lit latest.json ;
+  Double-cliquer "Arrivee Collab.cmd" (ou un raccourci vers lui). Le lanceur :
+    1. lit latest.json sur GitHub (release, puis depot) ;
     2. si la copie locale (%LOCALAPPDATA%\Arrivee-Collab\app) n'existe pas,
-       installe la derniere version automatiquement ;
-    3. demarre l'application.
-  Une fois lancee, l'app surveille ce dossier : si une nouvelle version parait,
-  une pastille "MAJ" s'affiche ; au clic, les notes sont presentees et la mise a
-  jour se fait (fermeture + remplacement + redemarrage). [Plan B]
+       telecharge la derniere version, controle son empreinte SHA-256 et la
+       signature de l'editeur, puis l'installe ;
+    3. demarre l'application (sans fenetre console).
+  Les mises a jour suivantes se font via la pastille "MAJ" de l'application.
+  Journal du lanceur : %LOCALAPPDATA%\Arrivee-Collab\bootstrap.log
+
+REPLI HORS GITHUB (optionnel)
+  Si GitHub est inaccessible, le lanceur lit latest.json et
+  Arrivee-Collab_version<X>.zip poses dans le MEME dossier que le .cmd.
 
 PUBLIER UNE NOUVELLE VERSION (cote mainteneur)
-  1. Incrementer Config.Version dans ArriveeCollab-PS\config.ps1.
-  2. Ajouter les notes de la version dans releases.json.
-  3. Lancer build-zip.ps1  -> produit le zip + latest.json + dist-ready.
-  4. Copier le contenu de dist-ready\ (ou extraire Arrivee-Collab-dist-ready.zip)
-     dans CE dossier OneDrive.
-
-ACCES : LECTURE SEULE suffit pour l'equipe (l'app ne fait que LIRE ces fichiers).
-Seul le mainteneur a besoin de l'acces en ecriture pour publier.
+  build-zip.ps1 regenere "Arrivee Collab.cmd" (en-tete + dist-launcher\bootstrap.ps1),
+  le zip signe et latest.json, puis publie sur GitHub. Le .cmd ne se met pas a
+  jour tout seul : le redistribuer seulement si le bundle est marque "COMPLET".

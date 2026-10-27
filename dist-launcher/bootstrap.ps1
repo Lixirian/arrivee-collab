@@ -1,5 +1,7 @@
 ﻿# ============================================================================
 #  Lanceur "toujours la dernière version" de l'outil Arrivee Collaborateur.
+#  Embarqué TEL QUEL dans « Arrivee Collab.cmd » (FICHIER UNIQUE généré par
+#  build-zip.ps1, comme Biblio-Tech.cmd) : seul le .cmd est à distribuer.
 #  A chaque lancement :
 #   1. lit latest.json -> version + zip attendus. CANAL PRINCIPAL : dépôt GitHub
 #      PUBLIC (raw.githubusercontent.com, AUCUN jeton, via le proxy système).
@@ -19,7 +21,9 @@ $Branch  = 'main'
 # Version minimale installable (première version avec l'ensemble des protections).
 $MinVersion = '1.13.0'
 $ReleasePublicKey = '<RSAKeyValue><Modulus>raIRN/8SJiSaul7c49MAezHpVdn+NqrVeiWVGITIrSYg8vnPJV6OUndLedwPAq8+JnsVJdzeublKQJ4gpsW7slTiBYMgHoP36anKfQVi5HvH3NxFIG0nEYUuXTwBI69ffiM6PnmgRWM4D0JaoKDy45PugMg48YQ7av2yfjzZrBAKHEUL3kYEomblDASWhHYqHFM/o1wt7y0qzHZ60cTgNJXTwLD0u50Hv/VRjorFbkm/AmgOfkG/wDFisdt2AiQDVD9y5XeGoKemdG4LVTs/CRDxyHVwGoWSMoIeR9AHYD4FQAuK4IG9as/LmbTqsOeBDxK1kXYaPoBmwhX7vt+j91U4EHXDf90s8yzfurWrP8Uaw3BDUJeFIiyTmcIj/9fQr5T7fMgsfm8p9Hz1mBXJXouHOxBJrYF5pFoLeOF8Sye9Sj6yAnWsIRYF0XkD0R4JwT+1txdtpO3SLdZwLy/pj40r5zUxAbf1yNfkYUSANfJHRgXxHUc5YwBTkxazJQCh</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>'
-$dist    = $PSScriptRoot
+# Dossier du lanceur : embarqué dans « Arrivee Collab.cmd » (fichier unique), $PSScriptRoot
+# est vide -> dossier du .cmd (AC_SELF, posé par son en-tête).
+$dist    = if ($PSScriptRoot) { $PSScriptRoot } elseif ($env:AC_SELF) { Split-Path -Parent $env:AC_SELF } else { $env:TEMP }
 $dataDir = Join-Path $env:LOCALAPPDATA 'Arrivee-Collab'
 $appDir  = Join-Path $dataDir 'app'
 $log     = Join-Path $dataDir 'bootstrap.log'
