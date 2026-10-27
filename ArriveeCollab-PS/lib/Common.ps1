@@ -69,11 +69,16 @@ function Enable-ClipboardHistory {
 }
 
 # ----------------------------------------------------------------------------
-#  Mode « mot de passe déjà initialisé » : Mon-AD n'affiche pas une date mais un
-#  décompte (« mot de passe défini il y a X jours »). L'opérateur saisit ce X et
-#  l'outil en déduit la date exacte (aujourd'hui - X), seule valeur reportée dans
-#  le mail et la note ServiceNow. Helpers purs => testables hors-GUI.
+#  Mode « mot de passe déjà initialisé » : Mon-AD n'affiche pas une date mais le
+#  nombre de jours RESTANTS avant que le mot de passe doive être changé.
+#  L'opérateur saisit ce X et l'outil en déduit la date d'initialisation :
+#  aujourd'hui - (durée de validité - X). C'est la seule valeur reportée dans le
+#  mail et la note ServiceNow. Helpers purs => testables hors-GUI.
 # ----------------------------------------------------------------------------
+
+# Durée de validité d'un mot de passe dans l'AD (jours affichés par Mon-AD
+# juste après une initialisation).
+$script:DureeValiditeMdp = 365
 
 # Normalise une saisie libre en nombre de jours.
 # Renvoie $null si ce n'est pas un entier positif ou s'il dépasse $Max (~10 ans),
@@ -96,6 +101,13 @@ function ConvertTo-NombreDeJours {
 function Get-DateDepuisJours {
     param([int]$Jours, [datetime]$Reference = (Get-Date))
     return $Reference.Date.AddDays(-$Jours)
+}
+
+# Date d'initialisation déduite des $JoursRestants avant expiration affichés par
+# Mon-AD : le mot de passe a été défini il y a ($DureeValidite - $JoursRestants) jours.
+function Get-DateInitDepuisJoursRestants {
+    param([int]$JoursRestants, [int]$DureeValidite = $script:DureeValiditeMdp, [datetime]$Reference = (Get-Date))
+    return Get-DateDepuisJours ($DureeValidite - $JoursRestants) $Reference
 }
 
 # --- Journalisation (fichier uniquement, jamais la console) ---

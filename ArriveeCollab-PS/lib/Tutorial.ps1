@@ -24,7 +24,7 @@ function Get-TutorialSteps {
            Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères, le copie dans le presse-papiers et prépare un fichier .zip protégé à joindre au mail."
            Target = { $btnGenPwd } }
         @{ Icon = ([char]::ConvertFromUtf32(0x26A0)); Title = 'Mot de passe déjà initialisé'
-           Text  = "Si le compte possède déjà un mot de passe, cochez cette case. Mon-AD affiche un décompte (« il y a X jours ») : saisissez simplement ce nombre de jours, l'outil calcule et affiche la date exacte correspondante. Vous pouvez aussi l'ajuster avec les flèches ↑ et ↓. L'outil enverra alors un mail différent (sans pièce jointe) au lieu de générer un nouveau mot de passe."
+           Text  = "Si le compte possède déjà un mot de passe, cochez cette case. Mon-AD affiche le nombre de jours restants avant de devoir changer le mot de passe : saisissez simplement ce nombre de jours, l'outil en déduit et affiche la date d'initialisation (validité de 365 jours). Vous pouvez aussi l'ajuster avec les flèches ↑ et ↓. L'outil enverra alors un mail différent (sans pièce jointe) au lieu de générer un nouveau mot de passe."
            Target = { $chkMdpDejaInit } }
         @{ Icon = ([char]::ConvertFromUtf32(0x2705)); Title = 'Vérifications avant envoi'
            Text  = "Avant de générer le .msg, l'outil vous demande de confirmer que vous avez bien modifié le mot de passe dans Mon-AD et déplacé le compte dans la bonne OU."

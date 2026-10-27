@@ -821,12 +821,12 @@ $chkMdpDejaInit.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(60
 $chkMdpDejaInit.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
 $chkMdpDejaInit.Cursor = [Windows.Forms.Cursors]::Hand
 
-# Mon-AD n'affiche pas une date d'initialisation mais un décompte
-# (« mot de passe défini il y a X jours ») : on saisit donc ce nombre de jours,
-# et l'outil en déduit la date exacte (aujourd'hui - X), affichée juste à côté.
+# Mon-AD n'affiche pas une date d'initialisation mais le nombre de jours restants
+# avant de devoir changer le mot de passe : on saisit donc ce nombre de jours, et
+# l'outil en déduit la date d'init (aujourd'hui - (365 - X)), affichée juste à côté.
 # C'est cette date calculée qui part dans le mail et la note ServiceNow.
 $lblDateInit = New-Object Windows.Forms.Label
-$lblDateInit.Text = "Initialisé il y a :"
+$lblDateInit.Text = "Expire dans :"
 $lblDateInit.AutoSize = $true
 $lblDateInit.Location = New-Object Drawing.Point($col2Lbl, 98)
 $lblDateInit.ForeColor = $cTextSecondary
@@ -835,8 +835,8 @@ $lblDateInit.Visible = $false
 $txtJoursInit = New-Object Windows.Forms.TextBox
 $txtJoursInit.Location = New-Object Drawing.Point($col2In, 95)
 $txtJoursInit.Width = 60
-$txtJoursInit.Text = "0"
-$txtJoursInit.MaxLength = 4
+$txtJoursInit.Text = "$script:DureeValiditeMdp"
+$txtJoursInit.MaxLength = 3
 $txtJoursInit.TextAlign = 'Center'
 $txtJoursInit.BackColor = $cSurface; $txtJoursInit.ForeColor = $cTextPrimary
 $txtJoursInit.BorderStyle = 'FixedSingle'; $txtJoursInit.Font = [Drawing.Font]::new("Segoe UI", 10)
@@ -862,9 +862,9 @@ $lblDateCalc.Visible = $false
 # $null si le nombre de jours saisi est vide ou invalide (la génération du .msg
 # s'appuie dessus pour bloquer avec un message clair).
 function Get-DateInitSaisie {
-    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text
+    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text -Max $script:DureeValiditeMdp
     if ($null -eq $jours) { return $null }
-    return (Get-DateDepuisJours $jours).ToString('dd/MM/yyyy')
+    return (Get-DateInitDepuisJoursRestants $jours).ToString('dd/MM/yyyy')
 }
 
 # Rafraîchit l'étiquette de date calculée affichée à droite du champ.
@@ -914,9 +914,9 @@ $txtJoursInit.Add_KeyPress({
 $txtJoursInit.Add_KeyDown({
     param($s, $e)
     if ($e.KeyCode -ne [Windows.Forms.Keys]::Up -and $e.KeyCode -ne [Windows.Forms.Keys]::Down) { return }
-    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text
-    if ($null -eq $jours) { $jours = 0 }
-    if ($e.KeyCode -eq [Windows.Forms.Keys]::Up) { $jours++ } elseif ($jours -gt 0) { $jours-- }
+    $jours = ConvertTo-NombreDeJours $txtJoursInit.Text -Max $script:DureeValiditeMdp
+    if ($null -eq $jours) { $jours = $script:DureeValiditeMdp }
+    if ($e.KeyCode -eq [Windows.Forms.Keys]::Up) { if ($jours -lt $script:DureeValiditeMdp) { $jours++ } } elseif ($jours -gt 0) { $jours-- }
     $txtJoursInit.Text = "$jours"
     $txtJoursInit.SelectionStart = $txtJoursInit.Text.Length
     $e.Handled = $true
@@ -1014,7 +1014,7 @@ $btnReset.Add_Click({
     $txtNomPrenom.Text = ""
     $txtPwd.Text = ""
     $chkMdpDejaInit.Checked = $false
-    $txtJoursInit.Text = "0"
+    $txtJoursInit.Text = "$script:DureeValiditeMdp"
     $btnGenPwd.Enabled = $true
     $btnGenPwd.BackColor = $cAccentViolet
     $txtPwd.BackColor = $cSurface
@@ -1376,10 +1376,10 @@ $btnGenMsg.Add_Click({
 
     if ($chkMdpDejaInit.Checked) {
         # --- Mode : mot de passe déjà initialisé ---
-        # Date envoyée = date du jour moins le décompte saisi (valeur lue dans Mon-AD).
+        # Date envoyée = déduite des jours restants avant expiration (valeur lue dans Mon-AD).
         $dateInit = Get-DateInitSaisie
         if (-not $dateInit) {
-            Show-AlertDialog -message "Indiquez depuis combien de jours le mot de passe est initialisé (nombre entier de jours, tel qu'affiché dans Mon-AD)." -title "Erreur"
+            Show-AlertDialog -message "Indiquez le nombre de jours restants avant expiration du mot de passe, tel qu'affiché dans Mon-AD (nombre entier de 0 à $script:DureeValiditeMdp)." -title "Erreur"
             return
         }
         $objet = "$ritm - Mot de passe déjà initialisé $nomPrenom"

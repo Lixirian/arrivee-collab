@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.9.0",
-    "zip":  "Arrivee-Collab_version1.9.0.zip",
+    "version":  "1.9.1",
+    "zip":  "Arrivee-Collab_version1.9.1.zip",
     "notes":  [
-                  "Mode « Mot de passe déjà initialisé » : on ne saisit plus une date au calendrier mais le nombre de jours affiché par Mon-AD (« il y a X jours »). L\u0027outil calcule et affiche aussitôt la date exacte correspondante, qui part dans le mail et dans la note ServiceNow. Les flèches ↑ et ↓ permettent d\u0027ajuster le décompte, et la génération du .msg est bloquée tant que le nombre de jours n\u0027est pas renseigné."
+                  "Correctif du mode « Mot de passe déjà initialisé » : le nombre de jours à saisir est celui affiché par Mon-AD, c\u0027est-à-dire les jours restants avant de devoir changer le mot de passe (« Expire dans X jours »). La date d\u0027initialisation est désormais calculée correctement à partir de la validité de 365 jours (par exemple 300 jours restants = mot de passe initialisé il y a 65 jours)."
               ]
 }

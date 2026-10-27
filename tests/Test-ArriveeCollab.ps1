@@ -36,6 +36,15 @@ Assert ((Get-DateDepuisJours 209 $ref) -eq [datetime]'2025-12-31') 'date : bascu
 Assert (((Get-DateDepuisJours 5 ([datetime]'2026-07-28 16:42:11')).TimeOfDay) -eq [timespan]::Zero) 'date : heure remise a minuit'
 Assert ((Get-DateDepuisJours 1 ([datetime]'2024-03-01')) -eq [datetime]'2024-02-29') 'date : annee bissextile'
 
+# --- Jours restants avant expiration (Mon-AD) -> date d'initialisation ---
+Assert ($script:DureeValiditeMdp -eq 365) 'restants : validite par defaut 365 jours'
+Assert ((Get-DateInitDepuisJoursRestants 365 -Reference $ref) -eq [datetime]'2026-07-28') 'restants : 365 -> initialise aujourd hui'
+Assert ((Get-DateInitDepuisJoursRestants 364 -Reference $ref) -eq [datetime]'2026-07-27') 'restants : 364 -> veille'
+Assert ((Get-DateInitDepuisJoursRestants 335 -Reference $ref) -eq [datetime]'2026-06-28') 'restants : 335 -> il y a 30 jours'
+Assert ((Get-DateInitDepuisJoursRestants 0 -Reference $ref) -eq [datetime]'2025-07-28') 'restants : 0 -> il y a 365 jours'
+Assert ((Get-DateInitDepuisJoursRestants 80 -DureeValidite 90 -Reference $ref) -eq [datetime]'2026-07-18') 'restants : duree de validite parametrable'
+Assert ($null -eq (ConvertTo-NombreDeJours '366' -Max $script:DureeValiditeMdp)) 'restants : au-dela de la validite -> null'
+
 # --- State round-trip + migration ---
 . (Join-Path $lib 'State.ps1')
 $tmpState = Join-Path $env:TEMP ("ac_state_test_" + [guid]::NewGuid().ToString('N') + ".json")
