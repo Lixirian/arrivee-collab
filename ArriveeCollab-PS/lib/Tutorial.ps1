@@ -7,7 +7,7 @@
 # Version du CONTENU du tutoriel. À INCRÉMENTER à chaque modification de
 # Get-TutorialSteps : un utilisateur ayant vu une version plus ancienne le revoit
 # une fois au lancement (bouton « Passer » disponible).
-$script:TutorialVersion = 7
+$script:TutorialVersion = 8
 
 # Étapes data-driven. Icon = caractère (ConvertFromUtf32, robuste à l'encodage).
 # Target = scriptblock renvoyant le contrôle à encadrer (ou $null pour une carte centrée).
@@ -23,6 +23,9 @@ function Get-TutorialSteps {
         @{ Icon = ([char]::ConvertFromUtf32(0x1F50D)); Title = 'Vérification des homonymes'
            Text  = "Dès que le nom et le prénom sont saisis, l'outil cherche automatiquement dans ServiceNow (page cachée, avec votre session) les comptes portant ce nom. Le résultat s'affiche à droite de ce bouton « Vérif. homonymes », qui permet aussi de relancer la recherche. S'il existe plusieurs comptes, une pastille rose « HOMONYMES DÉTECTÉS » apparaît : cliquez-la pour désigner le CP communiqué dans la RITM. Le formulaire passe alors en « mail au demandeur » : seul le bouton « Générer mail homonyme » reste actif, et le mail cite le CP communiqué et les CP trouvés. Si ServiceNow demande une connexion, une fenêtre s'ouvre le temps de vous connecter."
            Target = { $btnVerifHomo } }
+        @{ Icon = ([char]::ConvertFromUtf32(0x26D4)); Title = 'Vérification des doublons de demande'
+           Text  = "Dès que la RITM et le nom sont saisis, l'outil cherche aussi dans ServiceNow les tâches d'arrivée (« Support Site… », « Recherche des nouveaux gestionnaires ») du même bénéficiaire, en cours ou réalisées, rattachées à une AUTRE RITM. Le résultat s'affiche à droite du bouton « Vérif. doublons ». En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d'annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour choisir une autre RITM. N'oubliez pas ensuite de passer la balise de la RITM à « Annulation - Doublon » : l'outil vous le rappelle. Un doublon l'emporte sur les homonymes."
+           Target = { $btnVerifDoublon } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F511)); Title = 'Générer le mot de passe'
            Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères, le copie dans le presse-papiers et prépare un fichier .zip protégé à joindre au mail."
            Target = { $btnGenPwd } }

@@ -101,7 +101,9 @@ if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
 . (Join-Path $baseDir 'lib\State.ps1')
 . (Join-Path $baseDir 'lib\Update.ps1')
 . (Join-Path $baseDir 'lib\Tutorial.ps1')
+. (Join-Path $baseDir 'lib\SnowPage.ps1')
 . (Join-Path $baseDir 'lib\Homonymes.ps1')
+. (Join-Path $baseDir 'lib\Doublons.ps1')
 
 # Données d'exécution hors du dossier app (qui est écrasé à chaque MAJ) :
 # %LOCALAPPDATA%\Arrivee-Collab pour l'état/log, ...\data pour les sorties métier.
@@ -153,6 +155,8 @@ $cWhite        = [Drawing.Color]::White
 # et de l'orange (mot de passe déjà initialisé) pour être repéré au premier coup d'œil.
 $cHomonyme      = [Drawing.Color]::FromArgb(232, 67, 147)
 $cHomonymeHover = [Drawing.Color]::FromArgb(194, 53, 122)
+# Doublon de demande (annulation) : rouge « danger » de la palette.
+$cDangerHover   = [Drawing.Color]::FromArgb(192, 57, 43)
 
 function Show-AlertDialog {
     param(
@@ -489,6 +493,124 @@ function Show-HomonymesDialog {
     return $null
 }
 
+# Tâches d'arrivée déjà existantes pour ce bénéficiaire (autres RITM) : l'opérateur
+# choisit la RITM à citer dans le mail d'annulation, avec le rappel de la balise.
+# Renvoie @{ Action = 'ok'; Ritm = '...' } | @{ Action = 'ignore' } | $null (annulé).
+function Show-DoublonsDialog {
+    param($Taches, [string]$NomPrenom, [string]$RitmCourante, [string]$RitmActuelle)
+    $dlg = New-Object Windows.Forms.Form
+    $dlg.Text = "Doublon de demande"
+    $dlg.Size = New-Object Drawing.Size(860, 470)
+    $dlg.StartPosition = "CenterScreen"
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false; $dlg.MinimizeBox = $false
+    $dlg.BackColor = $cBgMain; $dlg.ForeColor = $cTextPrimary
+    $dlg.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $dlgIconPath = Join-Path $baseDir "image-arrivee-collab.ico"
+    if (Test-Path $dlgIconPath) { try { $dlg.Icon = New-Object Drawing.Icon($dlgIconPath) } catch {} }
+
+    $bar = New-Object Windows.Forms.Panel
+    $bar.Dock = "Top"; $bar.Height = 3; $bar.BackColor = $cDanger
+
+    $lblT = New-Object Windows.Forms.Label
+    $lblT.Text = "⛔  Demande déjà existante pour « $NomPrenom »"
+    $lblT.Font = [Drawing.Font]::new("Segoe UI", 13, [Drawing.FontStyle]::Bold)
+    $lblT.ForeColor = $cDanger
+    $lblT.Location = New-Object Drawing.Point(25, 15); $lblT.AutoSize = $true
+
+    $lblI = New-Object Windows.Forms.Label
+    $lblI.Text = "Sélectionnez la RITM à citer dans le mail d'annulation (par défaut la plus récente)."
+    $lblI.Location = New-Object Drawing.Point(25, 50); $lblI.Size = New-Object Drawing.Size(800, 22)
+    $lblI.ForeColor = $cTextSecondary
+
+    $lv = New-Object Windows.Forms.ListView
+    $lv.Location = New-Object Drawing.Point(25, 80); $lv.Size = New-Object Drawing.Size(795, 215)
+    $lv.View = 'Details'; $lv.FullRowSelect = $true; $lv.MultiSelect = $false; $lv.HideSelection = $false
+    $lv.BackColor = $cSurface; $lv.ForeColor = $cTextPrimary; $lv.BorderStyle = 'None'
+    $lv.HeaderStyle = 'Nonclickable'
+    foreach ($col in @(@('RITM', 115), @('Tâche', 120), @('Statut', 95), @('Description', 230), @('Ouverte le', 115), @('Fermée le', 100))) {
+        [void]$lv.Columns.Add($col[0], $col[1])
+    }
+    $lv.OwnerDraw = $true
+    $lv.Add_DrawColumnHeader({
+        param($s, $e)
+        $e.Graphics.FillRectangle((New-Object Drawing.SolidBrush($cBorder)), $e.Bounds)
+        [Windows.Forms.TextRenderer]::DrawText($e.Graphics, $e.Header.Text, $s.Font, $e.Bounds, $cWhite,
+            [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::Left)
+    })
+    $lv.Add_DrawItem({ param($s, $e) $e.DrawDefault = $true })
+    $lv.Add_DrawSubItem({ param($s, $e) $e.DrawDefault = $true })
+    $choisi = $false
+    foreach ($t in @($Taches)) {
+        $it = New-Object Windows.Forms.ListViewItem([string]$t.Ritm)
+        foreach ($v in @($t.Tache, $t.Statut, $t.Description, (([string]$t.Ouverte) -replace '\s.*$', ''), (([string]$t.Fermee) -replace '\s.*$', ''))) { [void]$it.SubItems.Add([string]$v) }
+        [void]$lv.Items.Add($it)
+        if (-not $choisi -and $RitmActuelle -and [string]$t.Ritm -eq $RitmActuelle) { $it.Selected = $true; $choisi = $true }
+    }
+    if (-not $choisi -and $lv.Items.Count -gt 0) { $lv.Items[0].Selected = $true }
+    $lv.Columns[5].Width = -2
+
+    # Rappel de la balise à poser sur la RITM traitée (action manuelle dans ServiceNow).
+    $lblRappel = New-Object Windows.Forms.Label
+    $lblRappel.Text = "Rappel : passez la balise de $RitmCourante à « Annulation - Doublon »."
+    $lblRappel.Location = New-Object Drawing.Point(25, 305); $lblRappel.Size = New-Object Drawing.Size(795, 24)
+    $lblRappel.ForeColor = $cWarning
+    $lblRappel.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+
+    $bp = New-Object Windows.Forms.Panel
+    $bp.Dock = "Bottom"; $bp.Height = 55; $bp.BackColor = $cBgSecondary
+
+    $btnOK = New-Object Windows.Forms.Button
+    $btnOK.Text = "Valider la RITM"
+    $btnOK.Size = New-Object Drawing.Size(190, 35)
+    $btnOK.Location = New-Object Drawing.Point(290, 10)
+    $btnOK.FlatStyle = 'Flat'; $btnOK.FlatAppearance.BorderSize = 0
+    $btnOK.FlatAppearance.MouseOverBackColor = $cDangerHover
+    $btnOK.BackColor = $cDanger; $btnOK.ForeColor = $cWhite
+    $btnOK.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+    $btnOK.Cursor = [Windows.Forms.Cursors]::Hand
+    $btnOK.Add_Click({
+        if ($lv.SelectedItems.Count -eq 0) {
+            Show-AlertDialog -message "Sélectionnez dans la liste la RITM à citer dans le mail." -title "RITM à citer"
+            return
+        }
+        $dlg.DialogResult = [Windows.Forms.DialogResult]::OK
+    })
+    $bp.Controls.Add($btnOK); $dlg.AcceptButton = $btnOK
+
+    $btnIgn = New-Object Windows.Forms.Button
+    $btnIgn.Text = "Pas un doublon"
+    $btnIgn.DialogResult = [Windows.Forms.DialogResult]::Ignore
+    $btnIgn.Size = New-Object Drawing.Size(170, 35)
+    $btnIgn.Location = New-Object Drawing.Point(490, 10)
+    $btnIgn.FlatStyle = 'Flat'; $btnIgn.FlatAppearance.BorderSize = 1
+    $btnIgn.FlatAppearance.BorderColor = $cBorder
+    $btnIgn.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(62, 62, 66)
+    $btnIgn.BackColor = $cBgSecondary; $btnIgn.ForeColor = $cTextPrimary
+    $btnIgn.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $btnIgn.Cursor = [Windows.Forms.Cursors]::Hand
+    $bp.Controls.Add($btnIgn)
+
+    $btnCancel = New-Object Windows.Forms.Button
+    $btnCancel.Text = "Annuler"
+    $btnCancel.DialogResult = [Windows.Forms.DialogResult]::Cancel
+    $btnCancel.Size = New-Object Drawing.Size(150, 35)
+    $btnCancel.Location = New-Object Drawing.Point(670, 10)
+    $btnCancel.FlatStyle = 'Flat'; $btnCancel.FlatAppearance.BorderSize = 0
+    $btnCancel.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(78, 78, 82)
+    $btnCancel.BackColor = $cBorder; $btnCancel.ForeColor = $cTextPrimary
+    $btnCancel.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $btnCancel.Cursor = [Windows.Forms.Cursors]::Hand
+    $bp.Controls.Add($btnCancel); $dlg.CancelButton = $btnCancel
+
+    $dlg.Add_Shown({ try { [DarkTitleBar]::Enable($this.Handle); [DarkTitleBar]::ApplyDarkScrollbar($lv.Handle) } catch {} })
+    $dlg.Controls.AddRange(@($bar, $lblT, $lblI, $lv, $lblRappel, $bp))
+    $r = $dlg.ShowDialog()
+    if ($r -eq [Windows.Forms.DialogResult]::OK) { return @{ Action = 'ok'; Ritm = $lv.SelectedItems[0].Text } }
+    if ($r -eq [Windows.Forms.DialogResult]::Ignore) { return @{ Action = 'ignore' } }
+    return $null
+}
+
 function Generate-Password {
     $l=12
     $pool = (48..57)+(65..90)+(97..122)+(33..38) | ForEach-Object {[char]$_}
@@ -771,6 +893,76 @@ Cordialement,<br/>
 "@
 }
 
+# Mail d'annulation quand la demande est un doublon d'une autre RITM.
+function Get-CorpsDoublonContenu {
+    param($ritmDoublon, $cheminHeader, $cheminSignature)
+    $r = [System.Net.WebUtility]::HtmlEncode([string]$ritmDoublon)
+    return @"
+<table style='width:100%'><tr>
+<td style='width:140px; vertical-align:top;'><img src='file:///$cheminHeader' style='width:130px;'/></td>
+<td style='vertical-align:top; padding-left:25px;'>
+<p>Bonjour,</p>
+<p>Nous annulons votre sollicitation car vous avez déjà une demande en cours de traitement ou réalisée <b>$r</b> pour ce même besoin.</p>
+<p>En vous remerciant de votre compréhension.</p>
+<div style='margin-top:20px; font-size:13px;'>
+Cordialement,<br/>
+<b>Votre Assistance Bureautique</b><br/>
+<img src='file:///$cheminSignature' style='width:330px; margin-top:12px;'/>
+</div>
+</td></tr></table>
+"@
+}
+
+function Get-CorpsMessageHTML_Doublon_Preview {
+    param($objet, $ritmDoublon, $cheminHeader, $cheminSignature)
+    $contenu = Get-CorpsDoublonContenu $ritmDoublon $cheminHeader $cheminSignature
+    $objetHtml = [System.Net.WebUtility]::HtmlEncode([string]$objet)
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; margin: 0; padding: 0; background: #1E1E1E;
+        scrollbar-base-color: #1E1E1E; scrollbar-face-color: #555; scrollbar-track-color: #252526;
+        scrollbar-arrow-color: #808080; scrollbar-highlight-color: #555; scrollbar-shadow-color: #1E1E1E;
+        scrollbar-3dlight-color: #252526; scrollbar-darkshadow-color: #1E1E1E; }
+    .sujet-preview { background: #2D2D30; border-left: 3px solid #E74C3C; color: #E74C3C; font-size: 15px;
+        font-weight: bold; padding: 10px 15px; margin: 12px 12px 0 12px; }
+    hr.sujet { border: 0; border-top: 1px solid #3E3E42; margin: 0 12px; }
+    .email-body { background: #fff; padding: 20px; margin: 0 12px 12px 12px; }
+    .email-body p { margin: 8px 0; color: #333; }
+</style>
+</head>
+<body>
+<div class='sujet-preview'>$objetHtml</div>
+<hr class='sujet'/>
+<div class='email-body'>
+$contenu
+</div>
+</body>
+</html>
+"@
+}
+
+function Get-CorpsMessageHTML_Doublon_Final {
+    param($ritmDoublon, $cheminHeader, $cheminSignature)
+    $contenu = Get-CorpsDoublonContenu $ritmDoublon $cheminHeader $cheminSignature
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 14px; margin: 20px; }
+    p { margin: 8px 0; }
+</style>
+</head>
+<body>
+$contenu
+</body>
+</html>
+"@
+}
+
 function Get-CorpsMessageHTML_Homonyme_Preview {
     param($objet, $nomPrenom, $cpDemande, $cpTrouves, $cheminHeader, $cheminSignature)
     $contenu = Get-CorpsHomonymeContenu $nomPrenom $cpDemande $cpTrouves $cheminHeader $cheminSignature
@@ -922,7 +1114,7 @@ function Update-UpdateBadge {
 # --- Panneau formulaire (fond secondaire) ---
 $panelForm = New-Object Windows.Forms.Panel
 $panelForm.Location = New-Object Drawing.Point(20, 75)
-$panelForm.Size = New-Object Drawing.Size(1045, 145)
+$panelForm.Size = New-Object Drawing.Size(1045, 179)
 $panelForm.BackColor = $cBgSecondary
 $panelForm.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($panelForm)
@@ -959,11 +1151,12 @@ $txtNomPrenom.Location = New-Object Drawing.Point($col1In, 55); $txtNomPrenom.Wi
 $txtNomPrenom.BackColor = $cSurface; $txtNomPrenom.ForeColor = $cTextPrimary
 $txtNomPrenom.BorderStyle = 'FixedSingle'; $txtNomPrenom.Font = [Drawing.Font]::new("Segoe UI", 10)
 
-# Ligne 2, colonne 2 : vérification d'homonymes dans ServiceNow (page cachée).
-# Lancée automatiquement ~1 s après la saisie du nom ; le bouton la relance.
+# Ligne 4 : vérifications ServiceNow (page cachée), lancées automatiquement ~1 s
+# après la saisie ; chaque bouton relance la sienne.
+#   colonne 1 = homonymes (nom), colonne 2 = doublons de demande (RITM + nom).
 $btnVerifHomo = New-Object Windows.Forms.Button
 $btnVerifHomo.Text = "Vérif. homonymes"
-$btnVerifHomo.Location = New-Object Drawing.Point($col2Lbl, 53)
+$btnVerifHomo.Location = New-Object Drawing.Point($col1Lbl, 131)
 $btnVerifHomo.Size = New-Object Drawing.Size(140, 28)
 $btnVerifHomo.FlatStyle = 'Flat'
 $btnVerifHomo.FlatAppearance.BorderSize = 1
@@ -976,13 +1169,34 @@ $btnVerifHomo.Cursor = [Windows.Forms.Cursors]::Hand
 # État de la vérification. En cas d'homonymes : pastille rose bien visible,
 # cliquable pour choisir le CP demandé.
 $lblHomo = New-Object Windows.Forms.Label
-$lblHomo.Location = New-Object Drawing.Point($col2In, 53)
+$lblHomo.Location = New-Object Drawing.Point($col1In, 131)
 $lblHomo.Size = New-Object Drawing.Size($inW, 28)
 $lblHomo.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
 $lblHomo.AutoEllipsis = $true
 $lblHomo.Padding = New-Object Windows.Forms.Padding(6, 0, 0, 0)
 $lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9)
 $global:TipHomo = New-Object Windows.Forms.ToolTip
+
+$btnVerifDoublon = New-Object Windows.Forms.Button
+$btnVerifDoublon.Text = "Vérif. doublons"
+$btnVerifDoublon.Location = New-Object Drawing.Point($col2Lbl, 131)
+$btnVerifDoublon.Size = New-Object Drawing.Size(140, 28)
+$btnVerifDoublon.FlatStyle = 'Flat'
+$btnVerifDoublon.FlatAppearance.BorderSize = 1
+$btnVerifDoublon.FlatAppearance.BorderColor = $cBorder
+$btnVerifDoublon.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(62, 62, 66)
+$btnVerifDoublon.BackColor = $cSurface; $btnVerifDoublon.ForeColor = $cTextPrimary
+$btnVerifDoublon.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$btnVerifDoublon.Cursor = [Windows.Forms.Cursors]::Hand
+
+# État des doublons. Doublon trouvé : pastille rouge cliquable (RITM à citer).
+$lblDoublon = New-Object Windows.Forms.Label
+$lblDoublon.Location = New-Object Drawing.Point($col2In, 131)
+$lblDoublon.Size = New-Object Drawing.Size($inW, 28)
+$lblDoublon.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+$lblDoublon.AutoEllipsis = $true
+$lblDoublon.Padding = New-Object Windows.Forms.Padding(6, 0, 0, 0)
+$lblDoublon.Font = [Drawing.Font]::new("Segoe UI", 9)
 
 # Images (droite du panneau)
 $picHeader = New-Object Windows.Forms.PictureBox
@@ -1150,7 +1364,7 @@ $txtJoursInit.Add_KeyDown({
 $txtJoursInit.Add_TextChanged({ Update-DateInitCalculee; Update-Preview })
 Update-DateInitCalculee
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$btnVerifHomo,$lblHomo,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$btnVerifHomo,$lblHomo,$btnVerifDoublon,$lblDoublon,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -1171,10 +1385,11 @@ function Layout-FormPanel {
     $txtEmail.Left = $c2x + $labelW
     $txtEmail.Width = $inW
 
-    # Ligne 2, colonne 2 : bouton homonymes (colonne des libellés) + état aligné sur les champs.
-    $btnVerifHomo.Left = $c2x
-    $lblHomo.Left = $c2x + $labelW
+    # Ligne 4 : boutons de vérification (colonne des libellés) + états alignés sur les champs.
     $lblHomo.Width = $inW
+    $btnVerifDoublon.Left = $c2x
+    $lblDoublon.Left = $c2x + $labelW
+    $lblDoublon.Width = $inW
 
     # Ligne 3, colonne 2 : décompte de jours + date calculée, alignés sur l'e-mail.
     $lblDateInit.Left = $c2x
@@ -1187,7 +1402,7 @@ Layout-FormPanel
 
 # --- Barre d'actions ---
 $panelActions = New-Object Windows.Forms.Panel
-$panelActions.Location = New-Object Drawing.Point(20, 230)
+$panelActions.Location = New-Object Drawing.Point(20, 264)
 $panelActions.Size = New-Object Drawing.Size(1045, 50)
 $panelActions.BackColor = $cBgSecondary
 $panelActions.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right
@@ -1239,9 +1454,13 @@ $btnReset.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
 $btnReset.Cursor = [Windows.Forms.Cursors]::Hand
 $btnReset.Add_Click({
     Set-ModeHomonyme $false
+    Set-ModeDoublon $false
     $global:HomoIgnore = $null
     $global:HomoComptes = @()
     $global:HomoDernierNom = $null
+    $global:DoublonIgnore = $null
+    $global:DoublonTaches = @()
+    $global:DoublonDerniereCle = $null
     $txtRITM.Text = ""
     $txtEmail.Text = ""
     $txtNomPrenom.Text = ""
@@ -1265,7 +1484,7 @@ $panelActions.Controls.AddRange(@($btnGenPwd, $txtPwd, $btnGenMsg, $btnReset))
 
 # --- Panneau d'éléments à copier (Note ServiceNow, à gauche) ---
 $panelCopy = New-Object Windows.Forms.Panel
-$panelCopy.Location = New-Object Drawing.Point(20, 290)
+$panelCopy.Location = New-Object Drawing.Point(20, 324)
 $panelCopy.Size = New-Object Drawing.Size(615, 137)
 $panelCopy.BackColor = $cBgSecondary
 $panelCopy.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left
@@ -1290,8 +1509,25 @@ $global:HomoComptes = @()        # comptes portant exactement le nom saisi
 $global:HomoCpDemande = $null    # CP communiqué dans la RITM (choisi par l'opérateur)
 $global:HomoIgnore = $null       # nom normalisé pour lequel l'opérateur a écarté l'alerte
 $global:HomoDernierNom = $null   # dernier nom envoyé à la vérification
+$global:HomoActif = $false       # homonymes détectés et non écartés
+
+# Mode « doublon » : une autre RITM existe déjà pour ce bénéficiaire (prioritaire).
+$global:ModeDoublon = $false
+$global:DoublonActif = $false        # doublon détecté et non écarté
+$global:DoublonTaches = @()          # tâches en doublon (Select-Doublons)
+$global:DoublonRitm = $null          # RITM citée dans le mail d'annulation
+$global:DoublonIgnore = $null        # clé « RITM|nom » pour laquelle l'alerte a été écartée
+$global:DoublonDerniereCle = $null   # dernière clé envoyée à la vérification
 
 function Get-CopyBlockText {
+    if ($global:ModeDoublon) {
+        $r = if ($global:DoublonRitm) { $global:DoublonRitm } else { "(à choisir)" }
+        return @(
+            "***Annulation - Doublon***",
+            "Doublon de $r",
+            "Mail envoyé au demandeur"
+        ) -join "`r`n"
+    }
     if ($global:ModeHomonyme) {
         $cp = if ($global:HomoCpDemande) { $global:HomoCpDemande } else { "(à choisir)" }
         $trouves = (Get-CpTrouves $global:HomoComptes $global:HomoCpDemande) -join ', '
@@ -1322,7 +1558,10 @@ function Get-CopyBlockText {
 # Message de clôture à destination du demandeur (« Note Utilisateur »).
 # Le texte change selon le mode (case « Mot de passe déjà initialisé »).
 function Get-MessageDemandeurText {
-    if ($global:ModeHomonyme) {
+    if ($global:ModeDoublon) {
+        $r = if ($global:DoublonRitm) { $global:DoublonRitm } else { "(RITM à choisir)" }
+        $corps = "Nous annulons votre sollicitation car vous avez déjà une demande en cours de traitement ou réalisée $r pour ce même besoin.`r`n`r`nEn vous remerciant de votre compréhension."
+    } elseif ($global:ModeHomonyme) {
         $corps = "Nous avons constaté la présence d'autres CP pour ce bénéficiaire. Un mail vous a été envoyé afin de savoir s'il s'agit d'un homonyme ou d'un changement de statut. Nous restons dans l'attente de votre retour."
     } elseif ($chkMdpDejaInit.Checked) {
         $corps = "Le compte est bien activé. Le mot de passe n'a pas été modifié, car il avait déjà été initialisé."
@@ -1381,7 +1620,7 @@ $panelCopy.Controls.AddRange(@($lblCopyTitle, $rtbCopy, $btnCopyAll))
 
 # --- Panneau « Note Utilisateur » (message au demandeur, à droite) ---
 $panelMsg = New-Object Windows.Forms.Panel
-$panelMsg.Location = New-Object Drawing.Point(650, 290)
+$panelMsg.Location = New-Object Drawing.Point(650, 324)
 $panelMsg.Size = New-Object Drawing.Size(415, 137)
 $panelMsg.BackColor = $cBgSecondary
 $panelMsg.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left
@@ -1452,14 +1691,14 @@ Layout-CopyPanels
 # --- Aperçu du sujet ---
 $lblSubjectLabel = New-Object Windows.Forms.Label
 $lblSubjectLabel.Text = "Objet :"
-$lblSubjectLabel.Location = New-Object Drawing.Point(20, 437)
+$lblSubjectLabel.Location = New-Object Drawing.Point(20, 471)
 $lblSubjectLabel.AutoSize = $true
 $lblSubjectLabel.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $lblSubjectLabel.ForeColor = $cTextSecondary
 $form.Controls.Add($lblSubjectLabel)
 
 $txtSubjectPreview = New-Object Windows.Forms.Label
-$txtSubjectPreview.Location = New-Object Drawing.Point(75, 433)
+$txtSubjectPreview.Location = New-Object Drawing.Point(75, 467)
 $txtSubjectPreview.Size = New-Object Drawing.Size(990, 28)
 $txtSubjectPreview.BackColor = $cSurface
 $txtSubjectPreview.ForeColor = $cAccentViolet
@@ -1472,15 +1711,15 @@ $form.Controls.Add($txtSubjectPreview)
 # --- Aperçu du message ---
 $lblPreviewLabel = New-Object Windows.Forms.Label
 $lblPreviewLabel.Text = "Aperçu du message"
-$lblPreviewLabel.Location = New-Object Drawing.Point(20, 474)
+$lblPreviewLabel.Location = New-Object Drawing.Point(20, 508)
 $lblPreviewLabel.AutoSize = $true
 $lblPreviewLabel.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
 $lblPreviewLabel.ForeColor = $cTextSecondary
 $form.Controls.Add($lblPreviewLabel)
 
 $panelPreview = New-Object Windows.Forms.Panel
-$panelPreview.Location = New-Object Drawing.Point(20, 497)
-$panelPreview.Size = New-Object Drawing.Size(1045, 375)
+$panelPreview.Location = New-Object Drawing.Point(20, 531)
+$panelPreview.Size = New-Object Drawing.Size(1045, 341)
 $panelPreview.BackColor = $cBgSecondary
 $panelPreview.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Left -bor [Windows.Forms.AnchorStyles]::Right -bor [Windows.Forms.AnchorStyles]::Bottom
 $form.Controls.Add($panelPreview)
@@ -1495,7 +1734,7 @@ $panelPreview.Controls.Add($webBrowser)
 # d'un clic la Note ServiceNow + la Note Utilisateur.
 $btnCopyCollapsed = New-Object Windows.Forms.Button
 $btnCopyCollapsed.Text = "📋  Copier tout (Note ServiceNow + Note Utilisateur)"
-$btnCopyCollapsed.Location = New-Object Drawing.Point(20, 288)
+$btnCopyCollapsed.Location = New-Object Drawing.Point(20, 322)
 $btnCopyCollapsed.Size = New-Object Drawing.Size(1045, 36)
 $btnCopyCollapsed.FlatStyle = 'Flat'
 $btnCopyCollapsed.FlatAppearance.BorderSize = 0
@@ -1564,8 +1803,8 @@ function Set-PreviewCollapsed([bool]$Collapsed) {
     $btnCopyCollapsed.Visible = $Collapsed
     if ($Collapsed) {
         $btnTogglePreview.Text = "▶ Aperçu"
-        $form.MinimumSize = New-Object Drawing.Size(1095, 348)
-        $form.Height = 380
+        $form.MinimumSize = New-Object Drawing.Size(1095, 382)
+        $form.Height = 414
     } else {
         $btnTogglePreview.Text = "▼ Aperçu"
         $form.Height = 920
@@ -1586,7 +1825,12 @@ if ($global:Ctx.State.PreviewCollapsed) { Set-PreviewCollapsed $true }
 function Update-Preview {
     $ritm = if($txtRITM.Text){$txtRITM.Text}else{"RITMXXXXX"}
     $nomPrenom = if($txtNomPrenom.Text){$txtNomPrenom.Text}else{"Prénom NOM"}
-    if ($global:ModeHomonyme) {
+    if ($global:ModeDoublon) {
+        $objet = "$ritm - Annulation doublon $nomPrenom"
+        $txtSubjectPreview.Text = $objet
+        $rD = if ($global:DoublonRitm) { $global:DoublonRitm } else { "(RITM à choisir)" }
+        $html = Get-CorpsMessageHTML_Doublon_Preview $objet $rD $cheminHeader $cheminSignature
+    } elseif ($global:ModeHomonyme) {
         $objet = "$ritm - Vérification homonyme $nomPrenom"
         $txtSubjectPreview.Text = $objet
         $cpD = if ($global:HomoCpDemande) { $global:HomoCpDemande } else { "(à choisir)" }
@@ -1608,49 +1852,57 @@ function Update-Preview {
     $webBrowser.DocumentText = $html
 }
 
-# --- Vérification d'homonymes (lib/Homonymes.ps1) ---
-# Affiche l'état de la vérification à droite du bouton « Homonymes ».
-#   Etat : idle | info | auth | erreur | ok | homonyme | ignore
+# --- Vérifications ServiceNow : homonymes (lib/Homonymes.ps1) et doublons de
+#     demande (lib/Doublons.ps1), exécutées par la page cachée (lib/SnowPage.ps1) ---
+
+# Style commun des étiquettes d'état (à droite des boutons « Vérif. … »).
+#   Etat : idle | info | auth | erreur | ok | alerte | ignore
+function Set-StatutLabel {
+    param($Label, [string]$Etat, [string]$Texte, $CouleurAlerte)
+    $Label.Text = $Texte
+    $global:TipHomo.SetToolTip($Label, $Texte)
+    $Label.Font = [Drawing.Font]::new("Segoe UI", 9)
+    $Label.BackColor = $cBgSecondary
+    $Label.Cursor = [Windows.Forms.Cursors]::Default
+    switch ($Etat) {
+        'ok'     { $Label.ForeColor = $cSuccess }
+        'auth'   { $Label.ForeColor = $cWarning; $Label.Cursor = [Windows.Forms.Cursors]::Hand }
+        'erreur' { $Label.ForeColor = $cDanger;  $Label.Cursor = [Windows.Forms.Cursors]::Hand }
+        'ignore' { $Label.ForeColor = $CouleurAlerte; $Label.Cursor = [Windows.Forms.Cursors]::Hand }
+        'alerte' {
+            $Label.BackColor = $CouleurAlerte; $Label.ForeColor = $cWhite
+            $Label.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+            $Label.Cursor = [Windows.Forms.Cursors]::Hand
+        }
+        default  { $Label.ForeColor = $cTextSecondary }
+    }
+}
+# Etat homonymes : idle | info | auth | erreur | ok | homonyme | ignore
 function Set-StatutHomo {
     param([string]$Etat, [string]$Texte)
     $global:HomoEtat = $Etat
-    $lblHomo.Text = $Texte
-    $global:TipHomo.SetToolTip($lblHomo, $Texte)
-    $lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9)
-    $lblHomo.BackColor = $cBgSecondary
-    $lblHomo.Cursor = [Windows.Forms.Cursors]::Default
-    switch ($Etat) {
-        'ok'       { $lblHomo.ForeColor = $cSuccess }
-        'auth'     { $lblHomo.ForeColor = $cWarning; $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
-        'erreur'   { $lblHomo.ForeColor = $cDanger;  $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
-        'ignore'   { $lblHomo.ForeColor = $cHomonyme; $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
-        'homonyme' {
-            $lblHomo.BackColor = $cHomonyme; $lblHomo.ForeColor = $cWhite
-            $lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
-            $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand
-        }
-        default    { $lblHomo.ForeColor = $cTextSecondary }
-    }
+    Set-StatutLabel $lblHomo $(if ($Etat -eq 'homonyme') { 'alerte' } else { $Etat }) $Texte $cHomonyme
+}
+# Etat doublons : idle | info | auth | erreur | ok | doublon | ignore
+function Set-StatutDoublon {
+    param([string]$Etat, [string]$Texte)
+    $global:DoublonEtat = $Etat
+    Set-StatutLabel $lblDoublon $(if ($Etat -eq 'doublon') { 'alerte' } else { $Etat }) $Texte $cDanger
 }
 
-# Bascule le formulaire en « mail au demandeur » : seule la génération du mail
-# reste active (pas de mot de passe, pas de vérification Mon-AD / OU).
-function Set-ModeHomonyme {
-    param([bool]$Actif)
-    if ([bool]$global:ModeHomonyme -ne $Actif) {
-        $global:ModeHomonyme = $Actif
-        if ($Actif) {
-            if ($chkMdpDejaInit.Checked) { $chkMdpDejaInit.Checked = $false }
-            $chkMdpDejaInit.Enabled = $false
-            $btnGenPwd.Enabled = $false
-            $btnGenPwd.BackColor = $cBorder
-            $btnGenMsg.Text = "Générer mail homonyme"
-            $btnGenMsg.BackColor = $cHomonyme
-            $btnGenMsg.FlatAppearance.MouseOverBackColor = $cHomonymeHover
-            $btnGenMsg.Enabled = $true
-            $txtSubjectPreview.ForeColor = $cHomonyme
-        } else {
-            $global:HomoCpDemande = $null
+# Mode du formulaire : 'normal', 'homonyme' (mail au demandeur sur les CP trouvés) ou
+# 'doublon' (annulation : mail au demandeur citant l'autre RITM). Dans les deux modes
+# spéciaux, seule la génération du mail reste active (pas de mot de passe, pas de
+# vérification Mon-AD / OU). Le doublon l'emporte : la demande est annulée, la question
+# des homonymes ne se pose plus.
+$global:ModeFormulaire = 'normal'
+function Update-ModeFormulaire {
+    $mode = if ($global:DoublonActif) { 'doublon' } elseif ($global:HomoActif) { 'homonyme' } else { 'normal' }
+    $global:ModeDoublon = ($mode -eq 'doublon')
+    $global:ModeHomonyme = ($mode -eq 'homonyme')
+    if ($mode -ne $global:ModeFormulaire) {
+        $global:ModeFormulaire = $mode
+        if ($mode -eq 'normal') {
             $chkMdpDejaInit.Enabled = $true
             $btnGenPwd.Enabled = $true
             $btnGenPwd.BackColor = $cAccentViolet
@@ -1659,11 +1911,51 @@ function Set-ModeHomonyme {
             $btnGenMsg.FlatAppearance.MouseOverBackColor = $cAccentBlueHover
             $btnGenMsg.Enabled = ($txtPwd.Text -ne "")
             $txtSubjectPreview.ForeColor = $cAccentViolet
+        } else {
+            $coul  = if ($mode -eq 'doublon') { $cDanger } else { $cHomonyme }
+            $hover = if ($mode -eq 'doublon') { $cDangerHover } else { $cHomonymeHover }
+            if ($chkMdpDejaInit.Checked) { $chkMdpDejaInit.Checked = $false }
+            $chkMdpDejaInit.Enabled = $false
+            $btnGenPwd.Enabled = $false
+            $btnGenPwd.BackColor = $cBorder
+            $btnGenMsg.Text = if ($mode -eq 'doublon') { "Générer mail doublon" } else { "Générer mail homonyme" }
+            $btnGenMsg.BackColor = $coul
+            $btnGenMsg.FlatAppearance.MouseOverBackColor = $hover
+            $btnGenMsg.Enabled = $true
+            $txtSubjectPreview.ForeColor = $coul
         }
     }
     $rtbCopy.Text = Get-CopyBlockText
     Update-Preview
 }
+function Set-ModeHomonyme {
+    param([bool]$Actif)
+    $global:HomoActif = $Actif
+    if (-not $Actif) { $global:HomoCpDemande = $null }
+    Update-ModeFormulaire
+}
+function Set-ModeDoublon {
+    param([bool]$Actif)
+    $global:DoublonActif = $Actif
+    if (-not $Actif) { $global:DoublonRitm = $null }
+    Update-ModeFormulaire
+}
+
+# Rappels de la page cachée pour un type de vérification (créée à la 1re demande).
+function Initialize-VerifSnow {
+    param([string]$Type)
+    if ($Type -eq 'homo') {
+        Initialize-SnowEngine -LibDir (Join-Path $baseDir 'lib\webview2') -DataDir $dataDir -Type 'homo' `
+            -OnResultat { param($n, $r) Set-ResultatHomonymes $n $r } `
+            -OnStatut { param($etat, $texte) if ($global:HomoEtat -ne 'homonyme' -or $etat -ne 'info') { Set-StatutHomo $etat $texte } }
+    } else {
+        Initialize-SnowEngine -LibDir (Join-Path $baseDir 'lib\webview2') -DataDir $dataDir -Type 'doublon' `
+            -OnResultat { param($c, $r) Set-ResultatDoublons $c $r } `
+            -OnStatut { param($etat, $texte) if ($global:DoublonEtat -ne 'doublon' -or $etat -ne 'info') { Set-StatutDoublon $etat $texte } }
+    }
+}
+
+# ---- Homonymes ----
 
 # Texte de la pastille rose selon que le CP demandé a été choisi ou non.
 function Update-StatutHomonyme {
@@ -1714,12 +2006,8 @@ function Invoke-VerifHomonymes {
     }
     if (-not $Force -and $nom -eq $global:HomoDernierNom) { return }
     $global:HomoDernierNom = $nom
-    if ($global:Homo.Phase -eq 'off') {
-        Initialize-HomonymeEngine -LibDir (Join-Path $baseDir 'lib\webview2') -DataDir $dataDir `
-            -OnResultat { param($n, $r) Set-ResultatHomonymes $n $r } `
-            -OnStatut { param($etat, $texte) if ($global:HomoEtat -ne 'homonyme' -or $etat -ne 'info') { Set-StatutHomo $etat $texte } }
-    }
-    Start-VerifHomonymes $nom
+    Initialize-VerifSnow 'homo'
+    Submit-SnowRequete 'homo' $nom (Get-UrlJsonHomonymes $nom)
 }
 
 # Choix du CP demandé parmi les homonymes. Renvoie $true si un CP est retenu.
@@ -1739,19 +2027,113 @@ function Open-ChoixHomonyme {
     return $true
 }
 
-# Saisie du nom : vérification différée (~1,2 s après la dernière frappe).
+# ---- Doublons de demande ----
+
+# Clé de la vérification doublons : RITM traitée + nom ($null si incomplet).
+function Get-CleDoublon {
+    $nom = $txtNomPrenom.Text.Trim()
+    $ritm = ConvertTo-NumeroRitm $txtRITM.Text
+    if (-not (Get-RequeteDoublons $nom) -or $ritm -notmatch '^RITM\d+$') { return $null }
+    return "$ritm|$nom"
+}
+function Get-TexteAttenteDoublon {
+    if (-not (Get-RequeteDoublons $txtNomPrenom.Text)) { return 'Saisir le nom et le prénom' }
+    if ((ConvertTo-NumeroRitm $txtRITM.Text) -notmatch '^RITM\d+$') { return 'Saisir la RITM pour vérifier' }
+    return 'Vérification à venir…'
+}
+
+# Pastille rouge : RITM citée dans le mail + rappel de la balise à poser.
+function Update-StatutDoublonAlerte {
+    $ritms = @(Get-RitmsDoublons $global:DoublonTaches)
+    $r = if ($global:DoublonRitm) { $global:DoublonRitm } else { $ritms[0] }
+    Set-StatutDoublon 'doublon' "⛔ DOUBLON : $r (cliquer)"
+    $global:TipHomo.SetToolTip($lblDoublon, "Demande déjà en cours ou réalisée pour ce bénéficiaire : $($ritms -join ', ')`r`nRappel : passer la balise de la RITM à « Annulation - Doublon ».`r`nCliquer pour voir le détail.")
+}
+
+# Résultat ServiceNow : tâches d'arrivée ramenées pour la clé « RITM|nom ».
+function Set-ResultatDoublons {
+    param([string]$Cle, $Records)
+    if ($Cle -ne (Get-CleDoublon)) { return }   # RITM ou nom modifié entre-temps
+    $ritm, $nom = $Cle.Split('|', 2)
+    $taches = @(Select-Doublons $Records $nom $ritm)
+    $global:DoublonTaches = $taches
+    if ($taches.Count -gt 0) {
+        $ritms = @(Get-RitmsDoublons $taches)
+        Write-AppLog "[DOUBLON] « $nom » ($ritm) : déjà demandé dans $($ritms -join ', ') (champ(s) $(@($taches)[0].Champs))."
+        if ($global:DoublonIgnore -eq $Cle) {
+            Set-ModeDoublon $false
+            Set-StatutDoublon 'ignore' "Doublon écarté ($($ritms -join ', ')) — cliquer pour revoir"
+            return
+        }
+        $global:DoublonRitm = $ritms[0]   # la plus récente par défaut
+        Set-ModeDoublon $true
+        Update-StatutDoublonAlerte
+    } else {
+        Set-ModeDoublon $false
+        Set-StatutDoublon 'ok' "✔ Pas de doublon de demande"
+    }
+}
+
+# Lance (ou relance avec -Force) la vérification des doublons (RITM + nom requis :
+# la RITM traitée a elle-même ses tâches dans la liste, elle doit être écartée).
+function Invoke-VerifDoublons {
+    param([switch]$Force)
+    $cle = Get-CleDoublon
+    if (-not $cle) {
+        $global:DoublonDerniereCle = $null
+        $global:DoublonTaches = @()
+        Set-ModeDoublon $false
+        Set-StatutDoublon 'idle' (Get-TexteAttenteDoublon)
+        return
+    }
+    if (-not $Force -and $cle -eq $global:DoublonDerniereCle) { return }
+    $global:DoublonDerniereCle = $cle
+    Initialize-VerifSnow 'doublon'
+    Submit-SnowRequete 'doublon' $cle (Get-UrlJsonDoublons ($cle.Split('|', 2)[1]))
+}
+
+# Choix de la RITM à citer. Renvoie $true si une RITM est retenue.
+function Open-ChoixDoublon {
+    $choix = Show-DoublonsDialog $global:DoublonTaches $txtNomPrenom.Text.Trim() (ConvertTo-NumeroRitm $txtRITM.Text) $global:DoublonRitm
+    if (-not $choix) { return [bool]$global:DoublonRitm }
+    if ($choix.Action -eq 'ignore') {
+        $global:DoublonIgnore = $global:DoublonDerniereCle
+        Set-ModeDoublon $false
+        Set-StatutDoublon 'ignore' "Doublon écarté ($((Get-RitmsDoublons $global:DoublonTaches) -join ', ')) — cliquer pour revoir"
+        return $false
+    }
+    $global:DoublonRitm = $choix.Ritm
+    Update-StatutDoublonAlerte
+    $rtbCopy.Text = Get-CopyBlockText
+    Update-Preview
+    return $true
+}
+
+# ---- Déclenchement ----
+
+# Saisie du nom ou de la RITM : vérifications différées (~1,2 s après la dernière frappe).
 $timerHomo = New-Object Windows.Forms.Timer
 $timerHomo.Interval = 1200
 $timerHomo.Add_Tick({
     $timerHomo.Stop()
     try { Invoke-VerifHomonymes } catch { Write-AppLog "[HOMO] Vérification KO : $($_.Exception.Message)"; Set-StatutHomo 'erreur' 'Vérification impossible (cliquer pour relancer)' }
+    try { Invoke-VerifDoublons } catch { Write-AppLog "[DOUBLON] Vérification KO : $($_.Exception.Message)"; Set-StatutDoublon 'erreur' 'Vérification impossible (cliquer pour relancer)' }
 }.GetNewClosure())
 $txtNomPrenom.Add_TextChanged({
-    # Le nom change : l'alerte précédente ne s'applique plus.
-    if ($global:ModeHomonyme) { Set-ModeHomonyme $false }
+    # Le nom change : les alertes précédentes ne s'appliquent plus.
+    if ($global:HomoActif) { Set-ModeHomonyme $false }
+    if ($global:DoublonActif) { Set-ModeDoublon $false }
     if ($txtNomPrenom.Text.Trim() -ne $global:HomoDernierNom) {
         $global:HomoCpDemande = $null
         if ($global:HomoEtat -ne 'auth') { Set-StatutHomo 'idle' $(if (Get-RequeteHomonymes $txtNomPrenom.Text) { 'Vérification à venir…' } else { 'Saisir le nom et le prénom' }) }
+    }
+    if ($global:DoublonEtat -ne 'auth' -and (Get-CleDoublon) -ne $global:DoublonDerniereCle) { Set-StatutDoublon 'idle' (Get-TexteAttenteDoublon) }
+    $timerHomo.Stop(); $timerHomo.Start()
+}.GetNewClosure())
+$txtRITM.Add_TextChanged({
+    if ((Get-CleDoublon) -ne $global:DoublonDerniereCle) {
+        if ($global:DoublonActif) { Set-ModeDoublon $false }
+        if ($global:DoublonEtat -ne 'auth') { Set-StatutDoublon 'idle' (Get-TexteAttenteDoublon) }
     }
     $timerHomo.Stop(); $timerHomo.Start()
 }.GetNewClosure())
@@ -1764,10 +2146,28 @@ $lblHomo.Add_Click({
         'homonyme' { [void](Open-ChoixHomonyme) }
         'ignore'   { $global:HomoIgnore = $null; Set-ModeHomonyme $true; Update-StatutHomonyme; [void](Open-ChoixHomonyme) }
         'erreur'   { Invoke-VerifHomonymes -Force }
-        'auth'     { Show-HomoAuth }
+        'auth'     { Show-SnowAuth }
+    }
+})
+$btnVerifDoublon.Add_Click({
+    try { Invoke-VerifDoublons -Force } catch { Write-AppLog "[DOUBLON] Vérification KO : $($_.Exception.Message)"; Set-StatutDoublon 'erreur' 'Vérification impossible (cliquer pour relancer)' }
+})
+$lblDoublon.Add_Click({
+    switch ($global:DoublonEtat) {
+        'doublon' { [void](Open-ChoixDoublon) }
+        'ignore'  {
+            $global:DoublonIgnore = $null
+            Set-ModeDoublon $true
+            $global:DoublonRitm = @(Get-RitmsDoublons $global:DoublonTaches)[0]
+            Update-StatutDoublonAlerte
+            [void](Open-ChoixDoublon)
+        }
+        'erreur'  { Invoke-VerifDoublons -Force }
+        'auth'    { Show-SnowAuth }
     }
 })
 Set-StatutHomo 'idle' 'Saisir le nom et le prénom'
+Set-StatutDoublon 'idle' 'Saisir le nom et le prénom'
 
 # --- Événements ---
 $btnGenPwd.Add_Click({
@@ -1791,6 +2191,30 @@ $btnGenMsg.Add_Click({
     $ritm = $txtRITM.Text.Trim(); $nomPrenom = $txtNomPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
     if ($ritm -eq "" -or $nomPrenom -eq "" -or $dest -eq "") {
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
+        return
+    }
+
+    if ($global:ModeDoublon) {
+        # --- Mode : doublon de demande -> mail d'annulation au demandeur, sans PJ ---
+        # Pas de mot de passe, pas de vérification Mon-AD / OU, pas de saisie bénéficiaire.
+        if (-not $global:DoublonRitm) {
+            if (-not (Open-ChoixDoublon)) { return }
+        }
+        $objet = "$ritm - Annulation doublon $nomPrenom"
+        $htmlFinal = Get-CorpsMessageHTML_Doublon_Final $global:DoublonRitm $cheminHeader $cheminSignature
+        $webBrowser.DocumentText = Get-CorpsMessageHTML_Doublon_Preview $objet $global:DoublonRitm $cheminHeader $cheminSignature
+        $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
+        if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
+            Write-AppLog "[DOUBLON] Mail d'annulation créé pour $ritm (doublon de $($global:DoublonRitm))."
+            $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
+            $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
+            if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
+                Invoke-Item $cheminMsg
+                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+            }
+        }
+        $rtbCopy.Text = Get-CopyBlockText
+        Show-AlertDialog -message "N'oubliez pas de changer la balise de $ritm dans ServiceNow :`n`n        Annulation - Doublon`n`n(demande en doublon de $($global:DoublonRitm))." -title "RAPPEL : BALISE DE LA RITM"
         return
     }
 
@@ -2306,9 +2730,9 @@ $form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() }
 # Fermeture : libère le WebView2 caché (et ses processus msedgewebview2).
 # Dispose() plutôt que Close() : Close passerait par FormClosing qui re-cache la fenêtre.
 $form.Add_FormClosed({
-    try { if ($global:Homo.Timer) { $global:Homo.Timer.Stop() } } catch { }
-    try { if ($global:Homo.WebView) { $global:Homo.WebView.Dispose() } } catch { }
-    try { if ($global:Homo.Form) { $global:Homo.Form.Dispose() } } catch { }
+    try { if ($global:Snow.Timer) { $global:Snow.Timer.Stop() } } catch { }
+    try { if ($global:Snow.WebView) { $global:Snow.WebView.Dispose() } } catch { }
+    try { if ($global:Snow.Form) { $global:Snow.Form.Dispose() } } catch { }
 })
 
 # Démarrage TOUJOURS centré sur l'écran principal — UNE SEULE fois (sinon le re-Show

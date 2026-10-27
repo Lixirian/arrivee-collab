@@ -1,4 +1,9 @@
 ﻿{
+    "1.12.0": [
+        "Vérification automatique des doublons de demande : dès que la RITM et le nom sont saisis, l'outil cherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les tâches d'arrivée du même bénéficiaire, en cours ou réalisées, rattachées à une autre RITM. Le résultat s'affiche à droite du nouveau bouton « Vérif. doublons ».",
+        "En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d'annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour en choisir une autre ou écarter l'alerte. Les notes ServiceNow et Utilisateur s'adaptent, et l'outil vous rappelle de passer la balise de la RITM à « Annulation - Doublon ». Un doublon l'emporte sur les homonymes.",
+        "Les deux vérifications ServiceNow (homonymes et doublons) sont regroupées sur une même ligne, sous le formulaire."
+    ],
     "1.11.0": [
         "Mises à jour détectées plus vite : l'outil vérifie toutes les 2 minutes et la pastille « Mise à jour » apparaît dès la publication d'une nouvelle version (comme le widget Biblio-Tech). La vérification se fait en arrière-plan, sans jamais figer la fenêtre.",
         "Sécurité renforcée : chaque mise à jour est désormais signée par l'éditeur. Avant toute installation, l'outil contrôle l'empreinte SHA-256 et la signature du paquet téléchargé, et refuse tout paquet qui ne serait pas authentique."

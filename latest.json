@@ -1,11 +1,12 @@
 ﻿{
-    "version":  "1.11.0",
-    "zip":  "Arrivee-Collab_version1.11.0.zip",
-    "sha256":  "07B01176A552303B9929457EF7587E8DE40CF827A775854718C1DB3B598E1644",
-    "sig":  "jUu63rhsVvotjB+WCNx9cLkgJJMnwl/S/SQb5Tfp6PGGNGONYNT0CeRVKgMlOmExhkNOaHQuWdzu5UxY5KzgkBHrOFHtcfPziJVnih1HZjq597hELzi9/YHUXFZhP6BSsJrd0l54q9HNNn9KIQlrBQD7LU640XrIN8AqBXn8cHQqd/rQYmrIN3Hvhy5fbIHHYO8Y6woA04QBI8WB5BHY1yupONER9+/rNrk8x86+huf1eyo1qVWkLKcZZfD+Xh3U+emu4+ilXr3yMBdmZ/tQF4T5OdoX5NNXIw27Onnid2cV+6SZFgpuy/RcD6pyfRzx2wjd1kJRatRYMHPpvBzQi5qiOPhXQUuJ1phGQ6lpxeEwfNuLix7N2v1EW7uVEHQyIjKb4QR4ehE7vdNe0ZWwQE5yCOTg5CUEMu2un/yzLL4i/mVUtnvOYQEBn1vALdUlgEsSzXxf+moHYud3SrJaR+xFo1TSsZvhQLx+1lbECqu/ny3DfUl0mUTDQuBMbsZa",
+    "version":  "1.12.0",
+    "zip":  "Arrivee-Collab_version1.12.0.zip",
+    "sha256":  "112BF65D46EB5FA3CAC4272E6911A1FDD0F6A185575771FFB57FE2AF3E08A63F",
+    "sig":  "YzYSghSp1GqfylmH9HBv9q+YuB5jTgKWqu7kbBj6WiMY7dQMxpPnWAYXq8keb53wRLIKU7hql51YDoRwgUm3B/j2Zg4n6ZYfoE9HbHGK6l/dSaBLctjqIco0PMynGhF7JaQ/HwMOdgE3Uqiaf4xN1lWOl4V7MFK5BafRdS5QJR1adUFMpph1jZPZDNYJOXfun7LwIAXa04wmNmksxdZjXmKqBbi2vfZ4zgMk17CV/ednAeJMHOukZFHC+m5O8dKv6L/Op2EniJsVFp3wh6dfRcc+MW1BOE5asY/kqS4wRQGwGrtYdO+i5oSvUnK/FFv8oF6BzP+YbQYqaHR44xr2LgHh98WrGMrkNz61psvmnopRlzD0Dnit25YlBfrNcqhqSOvMJ1FKQYl4piZolICJR+xB6eN7b68GrSbJigwiZroFA50I92qtB00TERA2DJAUeVmv7O1oKd3B/Kt0HSMszOfScYmyF+4/Lmr+wV/d50pcwbOyPrmc5330ED5p4PWi",
     "date":  "2026-10-27",
     "notes":  [
-                  "Mises à jour détectées plus vite : l\u0027outil vérifie toutes les 2 minutes et la pastille « Mise à jour » apparaît dès la publication d\u0027une nouvelle version (comme le widget Biblio-Tech). La vérification se fait en arrière-plan, sans jamais figer la fenêtre.",
-                  "Sécurité renforcée : chaque mise à jour est désormais signée par l\u0027éditeur. Avant toute installation, l\u0027outil contrôle l\u0027empreinte SHA-256 et la signature du paquet téléchargé, et refuse tout paquet qui ne serait pas authentique."
+                  "Vérification automatique des doublons de demande : dès que la RITM et le nom sont saisis, l\u0027outil cherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les tâches d\u0027arrivée du même bénéficiaire, en cours ou réalisées, rattachées à une autre RITM. Le résultat s\u0027affiche à droite du nouveau bouton « Vérif. doublons ».",
+                  "En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d\u0027annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour en choisir une autre ou écarter l\u0027alerte. Les notes ServiceNow et Utilisateur s\u0027adaptent, et l\u0027outil vous rappelle de passer la balise de la RITM à « Annulation - Doublon ». Un doublon l\u0027emporte sur les homonymes.",
+                  "Les deux vérifications ServiceNow (homonymes et doublons) sont regroupées sur une même ligne, sous le formulaire."
               ]
 }

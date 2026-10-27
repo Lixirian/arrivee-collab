@@ -73,6 +73,34 @@ Assert (-not (Test-PresenceHomonymes @())) 'homo : 0 compte -> pas d homonyme'
 Assert ((@(Select-Homonymes $recs 'Paul Martin')).Count -eq 0) 'homo : aucun compte'
 Assert (((Get-CpTrouves $m '7903222J') -join ', ') -eq 'PMGN1, 2222222B') 'homo : CP trouves = autres que le demande'
 
+# --- Doublons de demande (helpers purs de lib/Doublons.ps1) ---
+. (Join-Path $lib 'Doublons.ps1')
+Assert ($null -eq (Get-RequeteDoublons 'Melissa')) 'doublon : un seul mot -> pas de requete'
+$qd = Get-RequeteDoublons 'Melissa  GUFFLET'
+Assert ($qd -eq 'short_descriptionSTARTSWITHSupport Site^ORshort_descriptionSTARTSWITHRecherche des nouveaux gestionnaires^123TEXTQUERY321=Melissa GUFFLET^ORDERBYDESCsys_created_on') 'doublon : filtre de la liste + recherche texte + tri'
+Assert ((Get-RequeteDoublons 'A^x=1 B') -notmatch '\^x|=1') 'doublon : caracteres de requete neutralises'
+$ud = Get-UrlJsonDoublons 'Melissa GUFFLET'
+Assert ($ud.StartsWith('/sc_task.do?JSONv2&sysparm_action=getRecords&sysparm_query=') -and $ud -match '&displayvalue=all&') 'doublon : URL JSONv2 sc_task avec libelles'
+Assert ((ConvertTo-NumeroRitm ' ritm0123 456 ') -eq 'RITM0123456') 'doublon : normalisation du numero de RITM'
+$taches = @(
+    [pscustomobject]@{ number = 'SCTASK3233533'; dv_number = 'SCTASK3233533'; request_item = 'aaa'; dv_request_item = 'RITM0000002'; state = '3'; dv_state = 'Réalisé'; short_description = 'Support Site Arrivée'; u_beneficiaire = 'bbb'; dv_u_beneficiaire = 'GUFFLET Melissa'; opened_by = 'x'; dv_opened_by = 'PETOT Caroline'; dv_opened_at = '20/10/2026 10:00:00' }
+    [pscustomobject]@{ number = 'SCTASK3233424'; request_item = 'ccc'; dv_request_item = 'RITM0000001'; state = '2'; dv_state = 'En cours'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Mélissa' }
+    [pscustomobject]@{ number = 'SCTASK1'; dv_request_item = 'RITM0000003'; state = '4'; dv_state = 'Fermé incomplet'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK2'; dv_request_item = 'RITM0000004'; state = '3'; dv_state = 'Réalisé'; dv_u_beneficiaire = 'GUFFLET Melissa-Anne' }
+    [pscustomobject]@{ number = 'SCTASK3'; dv_request_item = 'RITM0000005'; state = '3'; dv_state = 'Réalisé'; dv_u_beneficiaire = 'DUPONT Jean'; dv_opened_by = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK4'; dv_request_item = 'RITM0000006'; state = '3'; dv_state = 'Annulé'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+)
+$dbl = @(Select-Doublons $taches 'Melissa GUFFLET' 'ritm0000001')
+Assert ($dbl.Count -eq 1 -and $dbl[0].Ritm -eq 'RITM0000002') 'doublon : seule l autre RITM non annulee du meme beneficiaire'
+Assert ($dbl[0].Tache -eq 'SCTASK3233533' -and $dbl[0].Statut -eq 'Réalisé' -and $dbl[0].Champs -eq 'u_beneficiaire') 'doublon : tache, statut et champ beneficiaire reconnus'
+Assert ((@(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')).Count -eq 2) 'doublon : sans la RITM courante, les deux RITM actives comptent'
+Assert ((@(Select-Doublons $taches 'Jean DUPONT' 'RITM0000009')).Count -eq 1) 'doublon : autre beneficiaire'
+Assert (Test-TacheAnnulee $taches[2]) 'doublon : etat 4 = annulee'
+Assert (Test-TacheAnnulee $taches[5]) 'doublon : libelle Annule = annulee'
+Assert (-not (Test-TacheAnnulee $taches[0])) 'doublon : realisee = non annulee'
+Assert ((@(Get-ChampsBeneficiaire $taches[4] 'Melissa GUFFLET')).Count -eq 0) 'doublon : nom present seulement comme demandeur -> ignore'
+Assert (((Get-RitmsDoublons @(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')) -join ',') -eq 'RITM0000002,RITM0000001') 'doublon : RITM distinctes dans l ordre'
+
 # --- State round-trip + migration ---
 . (Join-Path $lib 'State.ps1')
 $tmpState = Join-Path $env:TEMP ("ac_state_test_" + [guid]::NewGuid().ToString('N') + ".json")
@@ -199,7 +227,7 @@ try {
 # --- Tutoriel : étapes + décision d'affichage ---
 . (Join-Path $lib 'Tutorial.ps1')
 $steps = @(Get-TutorialSteps @{ })
-Assert (@($steps).Count -eq 15) 'tuto : 15 etapes'
+Assert (@($steps).Count -eq 16) 'tuto : 16 etapes'
 Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
 Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
 Assert (@($steps | Where-Object { -not $_.Icon }).Count -eq 0)  'tuto : chaque etape a une icone'
