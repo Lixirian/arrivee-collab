@@ -17,7 +17,9 @@
 #  Texte signé : « Arrivee-Collab|<version>|<SHA-256 du zip> » ; empreinte + signature vont
 #  dans latest.json (sha256, sig). L'app et le lanceur embarquent la clé PUBLIQUE et
 #  refusent tout zip non conforme : un compte GitHub compromis ne suffit pas à diffuser.
-#  Usage :  powershell -ExecutionPolicy Bypass -File build-zip.ps1 [-NoGit]
+#  FICHES : ..\Arrivee collab - Note DSI\ (Note DSI + Fiche cybersécurité, .docx hors dépôt) doivent
+#  indiquer la version publiée, sinon la publication est refusée (-SkipDocCheck pour passer outre).
+#  Usage :  powershell -ExecutionPolicy Bypass -File build-zip.ps1 [-NoGit] [-SkipDocCheck]
 #           ... -NewSigningKey  : crée la clé (UNE fois) et inscrit la clé publique dans
 #                                 config.ps1 et dist-launcher\bootstrap.ps1.
 #           ... -ExportSigningKey [-KeyBackup <fichier>] : sauvegarde de la clé chiffrée par
@@ -26,7 +28,7 @@
 #                                 acceptée par les postes (il faudrait redistribuer le lanceur).
 #           ... -ImportSigningKey -KeyBackup <fichier> : nouveau PC -> restaure la clé.
 # ============================================================================
-param([switch]$NoGit, [switch]$NewSigningKey, [switch]$ExportSigningKey, [switch]$ImportSigningKey, [string]$KeyBackup = '')
+param([switch]$NoGit, [switch]$SkipDocCheck, [switch]$NewSigningKey, [switch]$ExportSigningKey, [switch]$ImportSigningKey, [string]$KeyBackup = '')
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 $src  = Join-Path $repo 'ArriveeCollab-PS'
@@ -120,6 +122,34 @@ $m = [regex]::Match($cfg, "Version\s*=\s*'([^']+)'")
 if (-not $m.Success) { throw "Version introuvable dans config.ps1 (attendu : Version = '<x>')." }
 $ver = $m.Groups[1].Value
 $name = "Arrivee-Collab_version$ver"
+
+# Fiches DSI / cybersécurité (hors dépôt public : ..\Arrivee collab - Note DSI\) :
+# elles doivent indiquer la version publiée (« Version de l'outil : X » / « Version
+# analysée : X »), sinon la publication est refusée (-SkipDocCheck ou -NoGit : simple
+# avertissement). Contrôle par lecture du XML des .docx, même ouverts dans Word.
+$docDir = Join-Path (Split-Path $repo -Parent) 'Arrivee collab - Note DSI'
+if (Test-Path -LiteralPath $docDir) {
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+    $docsKo = @()
+    foreach ($doc in @(Get-ChildItem -LiteralPath $docDir -Filter '*.docx' | Where-Object { $_.Name -notlike '~$*' -and $_.Name -notmatch '\(sauvegarde ' })) {
+        $vDoc = $null
+        try {
+            $fs = [IO.File]::Open($doc.FullName, 'Open', 'Read', 'ReadWrite')
+            try {
+                $za = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Read)
+                $sr = New-Object IO.StreamReader($za.GetEntry('word/document.xml').Open())
+                $txt = $sr.ReadToEnd() -replace '<[^>]+>', ''; $sr.Dispose(); $za.Dispose()
+                $mv = [regex]::Match($txt, "(?i)version\s+(?:de l.outil|analys[ée]e)\s*:\s*(\d+(?:\.\d+)+)")
+                if ($mv.Success) { $vDoc = $mv.Groups[1].Value }
+            } finally { $fs.Dispose() }
+        } catch { }
+        if ($vDoc -ne $ver) { $docsKo += "$($doc.Name) (version indiquée : $(if ($vDoc) { $vDoc } else { 'introuvable' }))" }
+    }
+    if ($docsKo.Count -gt 0) {
+        $msgDoc = "Documents DSI / cybersécurité à mettre à jour pour la $ver : " + ($docsKo -join ' ; ')
+        if ($SkipDocCheck -or $NoGit) { Write-Host "Avertissement : $msgDoc" -ForegroundColor Yellow } else { throw "$msgDoc. (Relire ce que la version change, mettre à jour les fiches, ou -SkipDocCheck.)" }
+    } else { Write-Host "Fiches DSI / cybersécurité : à jour ($ver)." }
+} else { Write-Host "Avertissement : dossier des fiches DSI / cybersécurité introuvable ($docDir) : contrôle ignoré." -ForegroundColor Yellow }
 
 # Branche RÉELLEMENT lue par les apps installées et par le bootstrap
 # (raw.githubusercontent.com/<repo>/<branche>/latest.json). Même source de vérité
