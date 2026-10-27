@@ -4,9 +4,10 @@
 #  exécutée par la page ServiceNow cachée (lib/SnowPage.ps1).
 #
 #  Doublon = une AUTRE RITM (que celle traitée) dont une tâche « Support Site… » ou
-#  « Recherche des nouveaux gestionnaires » porte le même bénéficiaire, en cours ou
-#  réalisée (les tâches annulées ne comptent pas). Utilise ConvertTo-NomNormalise /
-#  Get-NomTokens de lib/Homonymes.ps1.
+#  « Recherche des nouveaux gestionnaires » porte le même bénéficiaire et est ENCORE
+#  EN COURS : deux demandes simultanées pour le même besoin. Une tâche réalisée,
+#  fermée ou annulée n'est pas un doublon (arrivée précédente, changement de statut…).
+#  Utilise ConvertTo-NomNormalise / Get-NomTokens de lib/Homonymes.ps1.
 # ============================================================================
 
 # Filtre de la liste des tâches d'arrivée (identique au lien de l'équipe).
@@ -16,15 +17,16 @@ $script:FiltreTachesArrivee = 'short_descriptionSTARTSWITHSupport Site^ORshort_d
 # qui n'y figure que là ne fait pas un doublon.
 $script:ChampsNonBeneficiaire = '^(opened_by|assigned_to|closed_by|resolved_by|sys_created_by|sys_updated_by|requested_by|caller_id|watch_list|work_notes_list|approval|u_demandeur.*|u_requester.*)$'
 
-# Filtre ServiceNow : tâches d'arrivée contenant le nom (recherche texte, comme le
-# champ « Rechercher » de la liste), les plus récentes d'abord. $null si moins de
-# deux mots. Les caractères de syntaxe des requêtes (^ =) sont neutralisés.
+# Filtre ServiceNow : tâches d'arrivée ACTIVES (non clôturées) contenant le nom
+# (recherche texte, comme le champ « Rechercher » de la liste), les plus récentes
+# d'abord. $null si moins de deux mots. Les caractères de syntaxe des requêtes (^ =)
+# sont neutralisés.
 function Get-RequeteDoublons {
     param([string]$NomPrenom)
     if ([string]::IsNullOrWhiteSpace($NomPrenom)) { return $null }
     $mots = @(($NomPrenom -replace '[\^=]', ' ').Trim() -split '\s+' | Where-Object { $_ -ne '' })
     if ($mots.Count -lt 2) { return $null }
-    return "$($script:FiltreTachesArrivee)^123TEXTQUERY321=$($mots -join ' ')^ORDERBYDESCsys_created_on"
+    return "$($script:FiltreTachesArrivee)^active=true^123TEXTQUERY321=$($mots -join ' ')^ORDERBYDESCsys_created_on"
 }
 
 # URL relative (same-origin) de la requête JSONv2 sur sc_task. Tous les champs sont
@@ -72,27 +74,48 @@ function Get-ChampsBeneficiaire {
     return $res
 }
 
-# Tâche annulée / fermée sans être réalisée : ne compte pas comme doublon.
-# (sc_task : 4 = Fermé incomplet, 7 = Fermé ignoré ; libellé « Annulé… » en repli.)
-function Test-TacheAnnulee {
+# Tâche ENCORE EN COURS ? (sc_task : 3 = Fermé réalisé, 4 = Fermé incomplet,
+# 7 = Fermé ignoré ; « active » = false une fois clôturée ; libellé en repli.)
+# Réalisée, fermée ou annulée => pas un doublon.
+function Test-TacheEnCours {
     param($Record)
-    $etat = [string]$Record.state
-    if ($etat -in @('4', '7')) { return $true }
-    return ((Get-ValeurAffichee $Record 'state') -match '(?i)annul|incompl|ignor|skip|cancel')
+    if ([string]$Record.active -eq 'false') { return $false }
+    if ([string]$Record.state -in @('3', '4', '7')) { return $false }
+    return -not ((Get-ValeurAffichee $Record 'state') -match '(?i)r[ée]alis|ferm|clos|cl[oô]tur|annul|incompl|ignor|skip|cancel|complete')
 }
 
-# Tâches en doublon : même bénéficiaire, autre RITM que celle traitée, non annulées.
+# Motifs de la demande traitée : descriptions (normalisées) de SES tâches présentes
+# dans les résultats (ex. « SUPPORT SITE ARRIVEE »). Vide si elles n'y figurent pas.
+function Get-MotifsRitmCourante {
+    param($Records, [string]$NomPrenom, [string]$RitmCourante)
+    $ritmCourante = ConvertTo-NumeroRitm $RitmCourante
+    $motifs = @()
+    foreach ($r in @($Records)) {
+        if ($null -eq $r) { continue }
+        if ((ConvertTo-NumeroRitm (Get-ValeurAffichee $r 'request_item')) -ne $ritmCourante) { continue }
+        $m = ConvertTo-NomNormalise (Get-ValeurAffichee $r 'short_description')
+        if ($m -and $motifs -notcontains $m) { $motifs += $m }
+    }
+    return $motifs
+}
+
+# Tâches en doublon : même bénéficiaire, autre RITM que celle traitée, encore en
+# cours, et MÊME MOTIF (même description de tâche) que la demande traitée. Si les
+# tâches de la demande traitée ne figurent pas dans les résultats (motif inconnu),
+# toutes les demandes en cours du bénéficiaire sont retenues (prudence).
 # Renvoie des objets @{ Ritm; Tache; Statut; Description; Ouverte; Fermee; Champs }.
 function Select-Doublons {
     param($Records, [string]$NomPrenom, [string]$RitmCourante)
     $ritmCourante = ConvertTo-NumeroRitm $RitmCourante
+    $motifs = @(Get-MotifsRitmCourante $Records $NomPrenom $RitmCourante)
     $res = @()
     foreach ($r in @($Records)) {
         if ($null -eq $r) { continue }
         $ritm = ConvertTo-NumeroRitm (Get-ValeurAffichee $r 'request_item')
         if (-not $ritm -or $ritm -notmatch '^RITM') { continue }
         if ($ritm -eq $ritmCourante) { continue }
-        if (Test-TacheAnnulee $r) { continue }
+        if (-not (Test-TacheEnCours $r)) { continue }
+        if ($motifs.Count -gt 0 -and $motifs -notcontains (ConvertTo-NomNormalise (Get-ValeurAffichee $r 'short_description'))) { continue }
         $champs = @(Get-ChampsBeneficiaire $r $NomPrenom)
         if ($champs.Count -eq 0) { continue }
         $res += [pscustomobject]@{

@@ -129,29 +129,37 @@ Assert (((Get-CpTrouves $m '7903222J') -join ', ') -eq 'PMGN1, 2222222B') 'homo 
 . (Join-Path $lib 'Doublons.ps1')
 Assert ($null -eq (Get-RequeteDoublons 'Melissa')) 'doublon : un seul mot -> pas de requete'
 $qd = Get-RequeteDoublons 'Melissa  GUFFLET'
-Assert ($qd -eq 'short_descriptionSTARTSWITHSupport Site^ORshort_descriptionSTARTSWITHRecherche des nouveaux gestionnaires^123TEXTQUERY321=Melissa GUFFLET^ORDERBYDESCsys_created_on') 'doublon : filtre de la liste + recherche texte + tri'
+Assert ($qd -eq 'short_descriptionSTARTSWITHSupport Site^ORshort_descriptionSTARTSWITHRecherche des nouveaux gestionnaires^active=true^123TEXTQUERY321=Melissa GUFFLET^ORDERBYDESCsys_created_on') 'doublon : filtre de la liste + actives + recherche texte + tri'
 Assert ((Get-RequeteDoublons 'A^x=1 B') -notmatch '\^x|=1') 'doublon : caracteres de requete neutralises'
 $ud = Get-UrlJsonDoublons 'Melissa GUFFLET'
 Assert ($ud.StartsWith('/sc_task.do?JSONv2&sysparm_action=getRecords&sysparm_query=') -and $ud -match '&displayvalue=all&') 'doublon : URL JSONv2 sc_task avec libelles'
 Assert ((ConvertTo-NumeroRitm ' ritm0123 456 ') -eq 'RITM0123456') 'doublon : normalisation du numero de RITM'
 $taches = @(
-    [pscustomobject]@{ number = 'SCTASK3233533'; dv_number = 'SCTASK3233533'; request_item = 'aaa'; dv_request_item = 'RITM0000002'; state = '3'; dv_state = 'Réalisé'; short_description = 'Support Site Arrivée'; u_beneficiaire = 'bbb'; dv_u_beneficiaire = 'GUFFLET Melissa'; opened_by = 'x'; dv_opened_by = 'PETOT Caroline'; dv_opened_at = '20/10/2026 10:00:00' }
-    [pscustomobject]@{ number = 'SCTASK3233424'; request_item = 'ccc'; dv_request_item = 'RITM0000001'; state = '2'; dv_state = 'En cours'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Mélissa' }
-    [pscustomobject]@{ number = 'SCTASK1'; dv_request_item = 'RITM0000003'; state = '4'; dv_state = 'Fermé incomplet'; dv_u_beneficiaire = 'GUFFLET Melissa' }
-    [pscustomobject]@{ number = 'SCTASK2'; dv_request_item = 'RITM0000004'; state = '3'; dv_state = 'Réalisé'; dv_u_beneficiaire = 'GUFFLET Melissa-Anne' }
-    [pscustomobject]@{ number = 'SCTASK3'; dv_request_item = 'RITM0000005'; state = '3'; dv_state = 'Réalisé'; dv_u_beneficiaire = 'DUPONT Jean'; dv_opened_by = 'GUFFLET Melissa' }
-    [pscustomobject]@{ number = 'SCTASK4'; dv_request_item = 'RITM0000006'; state = '3'; dv_state = 'Annulé'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK3233533'; dv_number = 'SCTASK3233533'; request_item = 'aaa'; dv_request_item = 'RITM0000002'; state = '2'; dv_state = 'En cours'; active = 'true'; short_description = 'Support Site Arrivée'; u_beneficiaire = 'bbb'; dv_u_beneficiaire = 'GUFFLET Melissa'; opened_by = 'x'; dv_opened_by = 'PETOT Caroline'; dv_opened_at = '20/10/2026 10:00:00' }
+    [pscustomobject]@{ number = 'SCTASK3233424'; request_item = 'ccc'; dv_request_item = 'RITM0000001'; state = '2'; dv_state = 'En cours'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Mélissa'; dv_opened_by = 'MARTIN Paul' }
+    [pscustomobject]@{ number = 'SCTASK1'; dv_request_item = 'RITM0000003'; state = '4'; dv_state = 'Fermé incomplet'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK2'; dv_request_item = 'RITM0000004'; state = '2'; dv_state = 'En cours'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Melissa-Anne' }
+    [pscustomobject]@{ number = 'SCTASK3'; dv_request_item = 'RITM0000005'; state = '2'; dv_state = 'En cours'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'DUPONT Jean'; dv_opened_by = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK4'; dv_request_item = 'RITM0000006'; state = '3'; dv_state = 'Réalisé'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK5'; dv_request_item = 'RITM0000007'; state = '2'; dv_state = 'En cours'; short_description = 'Recherche des nouveaux gestionnaires'; dv_u_beneficiaire = 'GUFFLET Melissa' }
+    [pscustomobject]@{ number = 'SCTASK6'; dv_request_item = 'RITM0000008'; state = '1'; dv_state = 'Ouvert'; active = 'false'; short_description = 'Support Site Arrivée'; dv_u_beneficiaire = 'GUFFLET Melissa' }
 )
+Assert ($qd -match '\^active=true\^') 'doublon : seules les taches actives sont demandees'
 $dbl = @(Select-Doublons $taches 'Melissa GUFFLET' 'ritm0000001')
-Assert ($dbl.Count -eq 1 -and $dbl[0].Ritm -eq 'RITM0000002') 'doublon : seule l autre RITM non annulee du meme beneficiaire'
-Assert ($dbl[0].Tache -eq 'SCTASK3233533' -and $dbl[0].Statut -eq 'Réalisé' -and $dbl[0].Champs -eq 'u_beneficiaire') 'doublon : tache, statut et champ beneficiaire reconnus'
-Assert ((@(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')).Count -eq 2) 'doublon : sans la RITM courante, les deux RITM actives comptent'
+Assert ($dbl.Count -eq 1 -and $dbl[0].Ritm -eq 'RITM0000002') 'doublon : seule l autre RITM en cours, meme motif, meme beneficiaire'
+Assert ($dbl[0].Tache -eq 'SCTASK3233533' -and $dbl[0].Statut -eq 'En cours' -and $dbl[0].Champs -eq 'u_beneficiaire') 'doublon : tache, statut et champ beneficiaire reconnus'
+Assert (((Get-MotifsRitmCourante $taches 'Melissa GUFFLET' 'RITM0000001') -join '|') -eq 'SUPPORT SITE ARRIVEE') 'doublon : motif de reference = description de la tache traitee'
+Assert ((@($dbl | Where-Object { $_.Ritm -eq 'RITM0000007' })).Count -eq 0) 'doublon : autre motif (Recherche des nouveaux gestionnaires) ignore'
+Assert ((@($dbl | Where-Object { $_.Ritm -eq 'RITM0000006' })).Count -eq 0) 'doublon : demande realisee ignoree'
+Assert ((@(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')).Count -eq 3) 'doublon : motif inconnu -> toutes les demandes en cours retenues'
 Assert ((@(Select-Doublons $taches 'Jean DUPONT' 'RITM0000009')).Count -eq 1) 'doublon : autre beneficiaire'
-Assert (Test-TacheAnnulee $taches[2]) 'doublon : etat 4 = annulee'
-Assert (Test-TacheAnnulee $taches[5]) 'doublon : libelle Annule = annulee'
-Assert (-not (Test-TacheAnnulee $taches[0])) 'doublon : realisee = non annulee'
+Assert (Test-TacheEnCours $taches[0]) 'doublon : en cours'
+Assert (-not (Test-TacheEnCours $taches[2])) 'doublon : etat 4 = clos'
+Assert (-not (Test-TacheEnCours $taches[5])) 'doublon : realise = clos'
+Assert (-not (Test-TacheEnCours $taches[7])) 'doublon : active=false = clos'
+Assert (-not (Test-TacheEnCours ([pscustomobject]@{ dv_state = 'Annulé' }))) 'doublon : libelle Annule = clos'
 Assert ((@(Get-ChampsBeneficiaire $taches[4] 'Melissa GUFFLET')).Count -eq 0) 'doublon : nom present seulement comme demandeur -> ignore'
-Assert (((Get-RitmsDoublons @(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')) -join ',') -eq 'RITM0000002,RITM0000001') 'doublon : RITM distinctes dans l ordre'
+Assert (((Get-RitmsDoublons @(Select-Doublons $taches 'Melissa GUFFLET' 'RITM0000009')) -join ',') -eq 'RITM0000002,RITM0000001,RITM0000007') 'doublon : RITM distinctes dans l ordre'
 
 # --- State round-trip + migration ---
 . (Join-Path $lib 'State.ps1')

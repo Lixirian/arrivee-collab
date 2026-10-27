@@ -2121,6 +2121,9 @@ function Set-ResultatDoublons {
     $ritm, $nom = $Cle.Split('|', 2)
     $taches = @(Select-Doublons $Records $nom $ritm)
     $global:DoublonTaches = $taches
+    $motifs = @(Get-MotifsRitmCourante $Records $nom $ritm)
+    $motifTxt = if ($motifs.Count) { $motifs -join ' / ' } else { 'inconnu (tâche de la RITM traitée absente : toutes les demandes en cours retenues)' }
+    Write-AppLog "[DOUBLON] $ritm : $(@($Records).Count) tâche(s) active(s) examinée(s), motif de référence : $motifTxt, $($taches.Count) doublon(s)."
     if ($taches.Count -gt 0) {
         $ritms = @(Get-RitmsDoublons $taches)
         Write-AppLog "[DOUBLON] $ritm : demande déjà existante ($($ritms -join ', ')) ; champ bénéficiaire reconnu : $(@($taches)[0].Champs)."

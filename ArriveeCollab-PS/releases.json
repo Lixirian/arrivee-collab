@@ -1,4 +1,7 @@
 ﻿{
+    "1.13.1": [
+        "Détection des doublons affinée : seule une autre demande ENCORE EN COURS, pour le même bénéficiaire et le même motif (même tâche, par exemple « Support Site Arrivée »), est signalée comme doublon, quel qu'en soit le demandeur. Une demande déjà réalisée (arrivée précédente, changement de statut…) ou d'un autre motif n'est plus signalée."
+    ],
     "1.13.0": [
         "Vérifications ServiceNow plus fiables : la recherche attend que la page soit complètement prête, et en cas d'absence de réponse ou de session expirée l'outil relance automatiquement la synchronisation SSO puis réessaie.",
         "Sécurité renforcée suite à une revue complète : mot de passe toujours composé d'une majuscule, d'une minuscule, d'un chiffre et d'un caractère spécial (sans caractères ambigus) ; copié hors de l'historique du presse-papiers (Win+V) et effacé au bout de 2 minutes ; fichiers temporaires du mot de passe supprimés automatiquement ; mails archivés conservés 30 jours.",

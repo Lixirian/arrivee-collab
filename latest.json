@@ -1,14 +1,11 @@
 ﻿{
-    "version":  "1.13.0",
-    "zip":  "Arrivee-Collab_version1.13.0.zip",
-    "sha256":  "73864C18B02CDAED07CDC6EEC53EAB5D2E253CA9EE4112641573BA45075190E7",
-    "sig":  "C+MDE7A4FHBhV1Rv2DtW1tGWEFLnPZjFu0HKbDwuqMgakhtYB+1xk0wAGv5IPyk86L2VfmN/xucnlqo2F15vcJ9njdfBROUMbzlJN3GrBUcJkGdD4y2RqyB/xe1mheDSDXbbVcPVakhWF1/bn3K0yh97/ogN9ut0xFIPexQlkMlT7fUd4u2fwVX9B1T3Vb+NaH8nlvYyWSKXVBpZjJmWruZYwvOepnuViHUmPhJulIj0zJlQjKLniSnBoMBawArfO9SVkbud3LL6m0AK2qWEhtFLuF5rBI/WEGtzq92F+KT3utQTi89K5HTPR/KwjGbbEHJsjlH1TwYvv8A4yTX4N2LvDAZICjyNfNx/vjINOjSMDT7GkuaFokjmIc6VMJAKjWp9rPPjmjTzImls4jYtPr+cNQ2aBEIi+B7bnPrrA6o38Mknm8XVg4xs5WZOAhs/fATLZPZ6K87ysJj2ILqt3srVfcOFabQbXS8LjgeTNsIuNa6DyqkNO0WNVbSuACjJ",
-    "msig":  "Xrq4TYv1TvNddDN4NJDwrhPeY6MrQSV4mYGSnWMXA6gyaVoLJNOa7YUg5vS5/m4h00DEwgKLYi9iaiH2AvmjXutnRBsq50tBVTnAYLlKJDHubVOqTOgS9MkbFmywgrW+B0rWdqVXKMBvnEJI4t3xfTV3OtFgfzKylAE7uxQfB6JY8tlAcXWqaBu7CzTxUARbbcZF/hUwA1bSMoS82cUidw31l8xrO1kHZRaRqBtDVKk0SXGGsqnqOdD3mlNS5hbVwk0/e42g2YTcmZi4wtAXtS1uZshLh31DienPbntM2GtryZoj/dh49QSEX6PckEcmMINnr5wjN9AC40//TKJRW1PKgI6pZaD5HLm1uqHhkRfdCLEjLYwkgRrdzaRAYHY9HCw2hnndmqaoMdXzIS4l7toIrwyG1RiATmKblWitoyB5Ypqs2FS8vWKDyrJi8luaBQfJNZ4zE/ovDuupkCLC2pqfYItNS57LERa7irWq2eVnvnSQbm54U3uaHiMtAsJg",
+    "version":  "1.13.1",
+    "zip":  "Arrivee-Collab_version1.13.1.zip",
+    "sha256":  "B789AF52857554768C0EB746A48F862C8AAA319465F1203A6F3B097335D8D88A",
+    "sig":  "it/voBRTkvVAaKt3cKUSlhw8KnNmk0VCiuqOSu8YcazCZGNMwsw/dp/8UaDx2zoUMiPASRBo2fmEsKIVKg69W6Ul61xyGXhi2WRl4w80WHs2uBSDE2XjguXkDlb5YHkIs1pDgnSiMcH4MC3xvYEuSI5SyL1aT4EAWdIMKKMNQ+aWT+ghKyzG6KTJzhBdrKw1W654BE4XUAXI9055WL/eCdn3b54UB3d5t5vK9gTtnpOQJz++C2G59cwTFwyNvvpShfcR+S4JLTet6/aY0a1H3XiLZVMoVewwY3Xen8Wc1uTwZNjTrVUDGh1qG6NDdLp6U+wu+GfNDRTLUrYl0Nqykl3836bqcO/7+shk+9ul0oMgwSACxh0Gu5X+6AYUbtD0+5NzmiabhmSa0QJ2t0zurT0hw7V2PS/M1uPL6DlDijE+KCexiWHQ2nVMVRhOI47CFCW6IrZj6mBpCSotLxy0LO3LBGwmbhdH+g7qhsZw+WToxsH37Gdg53rO1HP1+GAA",
+    "msig":  "FyiKARenTudvRW3n0ilajncXw1EOJbqd2UeEXuE6pWcOLxRmObWbCvuGjRfw5rwuMNr5P6sCajhMLk/Fq5uHkcOWZkCxsfRh1IkW4ezP4Y6rse+wjxeRQ1gZMtcpVCo42tSHEINU1wca5Bnu35sgePBmC/BhLwAo+7Al8gzk3+VcsY+gm5najowxo1P+P8qctyZxzEp+93MAjHwRJBihAN1waV3lsokdz2mL0BwL2buYjhMl6MlND2MU+FKP0H5dNprBVnphMXh+AG7os+jLP+CRk60sBAc7UTnrVa4Wx2ZXrANxSDznXguPiTxPbK/DPhOACVajpdF2DlLT8D7aTueOkfsor1HWESELhLXZ0QNPr1VA/sWkaAB0/wTTFwChiwXarsQ9MRqRL+dxJ8grkBB8+Ra23e0jzi1RE7FsWoiebceb10jLJSnkIdtIu3QeQAPz8t509X4/Z8OY34fWots++4hLpIWqskXaVJipWzIuH07aAm6CXAgvF3OsCytg",
     "date":  "2026-10-27",
     "notes":  [
-                  "Vérifications ServiceNow plus fiables : la recherche attend que la page soit complètement prête, et en cas d\u0027absence de réponse ou de session expirée l\u0027outil relance automatiquement la synchronisation SSO puis réessaie.",
-                  "Sécurité renforcée suite à une revue complète : mot de passe toujours composé d\u0027une majuscule, d\u0027une minuscule, d\u0027un chiffre et d\u0027un caractère spécial (sans caractères ambigus) ; copié hors de l\u0027historique du presse-papiers (Win+V) et effacé au bout de 2 minutes ; fichiers temporaires du mot de passe supprimés automatiquement ; mails archivés conservés 30 jours.",
-                  "Contrôle des saisies avant génération du mail (numéro de RITM, nom et prénom, adresse du demandeur) et protection de l\u0027aperçu contre tout contenu piégé.",
-                  "La case « Réduction auto en bulle » est désormais bien visible (case violette)."
+                  "Détection des doublons affinée : seule une autre demande ENCORE EN COURS, pour le même bénéficiaire et le même motif (même tâche, par exemple « Support Site Arrivée »), est signalée comme doublon, quel qu\u0027en soit le demandeur. Une demande déjà réalisée (arrivée précédente, changement de statut…) ou d\u0027un autre motif n\u0027est plus signalée."
               ]
 }
