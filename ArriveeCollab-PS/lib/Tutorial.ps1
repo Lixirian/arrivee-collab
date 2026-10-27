@@ -7,7 +7,7 @@
 # Version du CONTENU du tutoriel. À INCRÉMENTER à chaque modification de
 # Get-TutorialSteps : un utilisateur ayant vu une version plus ancienne le revoit
 # une fois au lancement (bouton « Passer » disponible).
-$script:TutorialVersion = 6
+$script:TutorialVersion = 7
 
 # Étapes data-driven. Icon = caractère (ConvertFromUtf32, robuste à l'encodage).
 # Target = scriptblock renvoyant le contrôle à encadrer (ou $null pour une carte centrée).
@@ -20,6 +20,9 @@ function Get-TutorialSteps {
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4DD)); Title = 'Les informations à saisir'
            Text  = "Renseignez ici le RITM, l'adresse e-mail du demandeur et le nom et prénom du nouveau collaborateur (un seul champ). L'aperçu du message se met à jour en temps réel."
            Target = { $panelForm } }
+        @{ Icon = ([char]::ConvertFromUtf32(0x1F50D)); Title = 'Vérification des homonymes'
+           Text  = "Dès que le nom et le prénom sont saisis, l'outil cherche automatiquement dans ServiceNow (page cachée, avec votre session) les comptes portant ce nom. Le résultat s'affiche à droite de ce bouton « Vérif. homonymes », qui permet aussi de relancer la recherche. S'il existe plusieurs comptes, une pastille rose « HOMONYMES DÉTECTÉS » apparaît : cliquez-la pour désigner le CP communiqué dans la RITM. Le formulaire passe alors en « mail au demandeur » : seul le bouton « Générer mail homonyme » reste actif, et le mail cite le CP communiqué et les CP trouvés. Si ServiceNow demande une connexion, une fenêtre s'ouvre le temps de vous connecter."
+           Target = { $btnVerifHomo } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F511)); Title = 'Générer le mot de passe'
            Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères, le copie dans le presse-papiers et prépare un fichier .zip protégé à joindre au mail."
            Target = { $btnGenPwd } }

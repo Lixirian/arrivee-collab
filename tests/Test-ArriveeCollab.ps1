@@ -45,6 +45,34 @@ Assert ((Get-DateInitDepuisJoursRestants 0 -Reference $ref) -eq [datetime]'2025-
 Assert ((Get-DateInitDepuisJoursRestants 80 -DureeValidite 90 -Reference $ref) -eq [datetime]'2026-07-18') 'restants : duree de validite parametrable'
 Assert ($null -eq (ConvertTo-NombreDeJours '366' -Max $script:DureeValiditeMdp)) 'restants : au-dela de la validite -> null'
 
+# --- Homonymes (helpers purs de lib/Homonymes.ps1) ---
+. (Join-Path $lib 'Homonymes.ps1')
+Assert ((ConvertTo-NomNormalise '  Jérémy   Pasturel ') -eq 'JEREMY PASTUREL') 'homo : normalisation accents/casse/espaces'
+Assert ((ConvertTo-NomNormalise "Jean-Christian D'Ors") -eq 'JEAN CHRISTIAN D ORS') 'homo : tirets et apostrophes'
+Assert ((ConvertTo-NomNormalise '') -eq '') 'homo : vide'
+Assert (((Get-NomTokens 'PASTUREL Jeremy') -join ' ') -eq ((Get-NomTokens 'Jérémy pasturel') -join ' ')) 'homo : ordre et accents ignores'
+Assert ($null -eq (Get-RequeteHomonymes 'Jeremy')) 'homo : un seul mot -> pas de requete'
+Assert ($null -eq (Get-RequeteHomonymes '   ')) 'homo : blanc -> pas de requete'
+Assert ((Get-RequeteHomonymes 'Jeremy  PASTUREL') -eq 'nameLIKEJeremy^nameLIKEPASTUREL') 'homo : requete LIKE par mot'
+Assert ((Get-RequeteHomonymes 'Jeremy^x=1 PASTUREL') -eq 'nameLIKEJeremy^nameLIKEx^nameLIKE1^nameLIKEPASTUREL') 'homo : caracteres de requete neutralises'
+$u = Get-UrlJsonHomonymes 'Jeremy PASTUREL'
+Assert ($u.StartsWith('/sys_user.do?JSONv2&sysparm_action=getRecords&sysparm_query=nameLIKEJeremy%5EnameLIKEPASTUREL&')) 'homo : URL JSONv2 encodee'
+Assert ($u -match 'sysparm_fields=user_name,name,first_name,last_name,email,active,sys_created_on') 'homo : champs demandes'
+$recs = @(
+    [pscustomobject]@{ user_name = '7903222J'; name = 'PASTUREL Jeremy' }
+    [pscustomobject]@{ user_name = 'PMGN1';    name = 'PASTUREL Jérémy' }
+    [pscustomobject]@{ user_name = '1111111A'; name = 'PASTUREL Jeremy-Paul' }
+    [pscustomobject]@{ user_name = '2222222B'; name = ''; first_name = 'jeremy'; last_name = 'pasturel' }
+)
+$m = @(Select-Homonymes $recs 'Jeremy PASTUREL')
+Assert ($m.Count -eq 3) 'homo : correspondances exactes (accents, ordre, prenom+nom de repli)'
+Assert (-not (@($m.user_name) -contains '1111111A')) 'homo : nom compose different ecarte'
+Assert (Test-PresenceHomonymes $m) 'homo : 3 comptes -> homonymes'
+Assert (-not (Test-PresenceHomonymes @($recs[0]))) 'homo : 1 compte -> pas d homonyme'
+Assert (-not (Test-PresenceHomonymes @())) 'homo : 0 compte -> pas d homonyme'
+Assert ((@(Select-Homonymes $recs 'Paul Martin')).Count -eq 0) 'homo : aucun compte'
+Assert (((Get-CpTrouves $m '7903222J') -join ', ') -eq 'PMGN1, 2222222B') 'homo : CP trouves = autres que le demande'
+
 # --- State round-trip + migration ---
 . (Join-Path $lib 'State.ps1')
 $tmpState = Join-Path $env:TEMP ("ac_state_test_" + [guid]::NewGuid().ToString('N') + ".json")
@@ -138,7 +166,7 @@ try {
 # --- Tutoriel : étapes + décision d'affichage ---
 . (Join-Path $lib 'Tutorial.ps1')
 $steps = @(Get-TutorialSteps @{ })
-Assert (@($steps).Count -eq 14) 'tuto : 14 etapes'
+Assert (@($steps).Count -eq 15) 'tuto : 15 etapes'
 Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
 Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
 Assert (@($steps | Where-Object { -not $_.Icon }).Count -eq 0)  'tuto : chaque etape a une icone'

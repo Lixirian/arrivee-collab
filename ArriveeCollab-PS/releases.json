@@ -1,4 +1,9 @@
 ﻿{
+    "1.10.0": [
+        "Vérification automatique des homonymes : dès que le nom et le prénom sont saisis, l'outil recherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les comptes portant ce nom. Le résultat s'affiche à droite du bouton « Vérif. homonymes », qui permet aussi de relancer la recherche.",
+        "En cas d'homonymes, une pastille rose « HOMONYMES DÉTECTÉS » apparaît : cliquez-la pour désigner le CP communiqué dans la RITM. Le formulaire passe alors en mail au demandeur (« Générer mail homonyme ») avec le CP communiqué et les CP trouvés ; la génération du mot de passe et les vérifications Mon-AD / OU sont désactivées. Les notes ServiceNow et Utilisateur s'adaptent.",
+        "Si ServiceNow réclame une connexion que le SSO ne peut pas faire seul, une fenêtre de connexion s'ouvre une seule fois, puis la session est mémorisée."
+    ],
     "1.9.1": [
         "Correctif du mode « Mot de passe déjà initialisé » : le nombre de jours à saisir est celui affiché par Mon-AD, c'est-à-dire les jours restants avant de devoir changer le mot de passe (« Expire dans X jours »). La date d'initialisation est désormais calculée correctement à partir de la validité de 365 jours (par exemple 300 jours restants = mot de passe initialisé il y a 65 jours)."
     ],

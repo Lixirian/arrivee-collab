@@ -101,6 +101,7 @@ if ([System.AppDomain]::CurrentDomain.FriendlyName -like '*.exe') {
 . (Join-Path $baseDir 'lib\State.ps1')
 . (Join-Path $baseDir 'lib\Update.ps1')
 . (Join-Path $baseDir 'lib\Tutorial.ps1')
+. (Join-Path $baseDir 'lib\Homonymes.ps1')
 
 # Données d'exécution hors du dossier app (qui est écrasé à chaque MAJ) :
 # %LOCALAPPDATA%\Arrivee-Collab pour l'état/log, ...\data pour les sorties métier.
@@ -148,6 +149,10 @@ $cWarning      = [Drawing.Color]::FromArgb(243, 156, 18)
 $cTextPrimary  = [Drawing.Color]::FromArgb(204, 204, 204)
 $cTextSecondary= [Drawing.Color]::FromArgb(128, 128, 128)
 $cWhite        = [Drawing.Color]::White
+# Signalement des homonymes : rose vif, distinct du violet (actions), du bleu (.msg)
+# et de l'orange (mot de passe déjà initialisé) pour être repéré au premier coup d'œil.
+$cHomonyme      = [Drawing.Color]::FromArgb(232, 67, 147)
+$cHomonymeHover = [Drawing.Color]::FromArgb(194, 53, 122)
 
 function Show-AlertDialog {
     param(
@@ -369,6 +374,118 @@ function Show-BeneficiaireDialog {
     if ($result -eq [Windows.Forms.DialogResult]::OK) {
         return @{ Email = $txtEmailB.Text.Trim(); OU = $ouMap[$cboOU.SelectedItem] }
     }
+    return $null
+}
+
+# Liste des comptes homonymes trouvés dans ServiceNow : l'opérateur y désigne le CP
+# communiqué dans la RITM ; les autres seront cités comme « CP trouvé » dans le mail.
+# Renvoie @{ Action = 'ok'; CpDemande = '...' } | @{ Action = 'ignore' } | $null (annulé).
+function Show-HomonymesDialog {
+    param($Comptes, [string]$NomPrenom, [string]$CpActuel)
+    $dlg = New-Object Windows.Forms.Form
+    $dlg.Text = "Homonymes détectés"
+    $dlg.Size = New-Object Drawing.Size(820, 430)
+    $dlg.StartPosition = "CenterScreen"
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false; $dlg.MinimizeBox = $false
+    $dlg.BackColor = $cBgMain; $dlg.ForeColor = $cTextPrimary
+    $dlg.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $dlgIconPath = Join-Path $baseDir "image-arrivee-collab.ico"
+    if (Test-Path $dlgIconPath) { try { $dlg.Icon = New-Object Drawing.Icon($dlgIconPath) } catch {} }
+
+    $bar = New-Object Windows.Forms.Panel
+    $bar.Dock = "Top"; $bar.Height = 3; $bar.BackColor = $cHomonyme
+
+    $lblT = New-Object Windows.Forms.Label
+    $lblT.Text = "⚠  $(@($Comptes).Count) comptes « $NomPrenom » dans ServiceNow"
+    $lblT.Font = [Drawing.Font]::new("Segoe UI", 13, [Drawing.FontStyle]::Bold)
+    $lblT.ForeColor = $cHomonyme
+    $lblT.Location = New-Object Drawing.Point(25, 15); $lblT.AutoSize = $true
+
+    $lblI = New-Object Windows.Forms.Label
+    $lblI.Text = "Sélectionnez le CP communiqué dans la RITM. Les autres seront indiqués au demandeur comme « CP trouvé »."
+    $lblI.Location = New-Object Drawing.Point(25, 50); $lblI.Size = New-Object Drawing.Size(760, 22)
+    $lblI.ForeColor = $cTextSecondary
+
+    $lv = New-Object Windows.Forms.ListView
+    $lv.Location = New-Object Drawing.Point(25, 80); $lv.Size = New-Object Drawing.Size(755, 225)
+    $lv.View = 'Details'; $lv.FullRowSelect = $true; $lv.MultiSelect = $false; $lv.HideSelection = $false
+    $lv.BackColor = $cSurface; $lv.ForeColor = $cTextPrimary; $lv.BorderStyle = 'None'
+    $lv.HeaderStyle = 'Nonclickable'
+    foreach ($col in @(@('CP', 110), @('Nom', 200), @('E-mail', 255), @('Actif', 60), @('Créé le', 120))) {
+        [void]$lv.Columns.Add($col[0], $col[1])
+    }
+    # En-têtes sombres (le rendu système les laisserait blancs) ; lignes au rendu standard.
+    $lv.OwnerDraw = $true
+    $lv.Add_DrawColumnHeader({
+        param($s, $e)
+        $e.Graphics.FillRectangle((New-Object Drawing.SolidBrush($cBorder)), $e.Bounds)
+        [Windows.Forms.TextRenderer]::DrawText($e.Graphics, $e.Header.Text, $s.Font, $e.Bounds, $cWhite,
+            [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::Left)
+    })
+    $lv.Add_DrawItem({ param($s, $e) $e.DrawDefault = $true })
+    $lv.Add_DrawSubItem({ param($s, $e) $e.DrawDefault = $true })
+    foreach ($c in @($Comptes)) {
+        $actif = if ([string]$c.active -eq 'true') { 'Oui' } else { 'Non' }
+        $cree = ([string]$c.sys_created_on) -replace '\s.*$', ''
+        $it = New-Object Windows.Forms.ListViewItem([string]$c.user_name)
+        foreach ($v in @([string]$c.name, [string]$c.email, $actif, $cree)) { [void]$it.SubItems.Add($v) }
+        [void]$lv.Items.Add($it)
+        if ($CpActuel -and [string]$c.user_name -eq $CpActuel) { $it.Selected = $true }
+    }
+    $lv.Columns[4].Width = -2   # dernière colonne étirée jusqu'au bord (pas d'en-tête blanc résiduel)
+
+    $bp = New-Object Windows.Forms.Panel
+    $bp.Dock = "Bottom"; $bp.Height = 55; $bp.BackColor = $cBgSecondary
+
+    $btnOK = New-Object Windows.Forms.Button
+    $btnOK.Text = "Valider le CP demandé"
+    $btnOK.Size = New-Object Drawing.Size(210, 35)
+    $btnOK.Location = New-Object Drawing.Point(230, 10)
+    $btnOK.FlatStyle = 'Flat'; $btnOK.FlatAppearance.BorderSize = 0
+    $btnOK.FlatAppearance.MouseOverBackColor = $cHomonymeHover
+    $btnOK.BackColor = $cHomonyme; $btnOK.ForeColor = $cWhite
+    $btnOK.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
+    $btnOK.Cursor = [Windows.Forms.Cursors]::Hand
+    $btnOK.Add_Click({
+        if ($lv.SelectedItems.Count -eq 0) {
+            Show-AlertDialog -message "Sélectionnez dans la liste le CP communiqué dans la RITM." -title "CP demandé"
+            return
+        }
+        $dlg.DialogResult = [Windows.Forms.DialogResult]::OK
+    })
+    $bp.Controls.Add($btnOK); $dlg.AcceptButton = $btnOK
+
+    $btnIgn = New-Object Windows.Forms.Button
+    $btnIgn.Text = "Pas un homonyme"
+    $btnIgn.DialogResult = [Windows.Forms.DialogResult]::Ignore
+    $btnIgn.Size = New-Object Drawing.Size(170, 35)
+    $btnIgn.Location = New-Object Drawing.Point(450, 10)
+    $btnIgn.FlatStyle = 'Flat'; $btnIgn.FlatAppearance.BorderSize = 1
+    $btnIgn.FlatAppearance.BorderColor = $cBorder
+    $btnIgn.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(62, 62, 66)
+    $btnIgn.BackColor = $cBgSecondary; $btnIgn.ForeColor = $cTextPrimary
+    $btnIgn.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $btnIgn.Cursor = [Windows.Forms.Cursors]::Hand
+    $bp.Controls.Add($btnIgn)
+
+    $btnCancel = New-Object Windows.Forms.Button
+    $btnCancel.Text = "Annuler"
+    $btnCancel.DialogResult = [Windows.Forms.DialogResult]::Cancel
+    $btnCancel.Size = New-Object Drawing.Size(150, 35)
+    $btnCancel.Location = New-Object Drawing.Point(630, 10)
+    $btnCancel.FlatStyle = 'Flat'; $btnCancel.FlatAppearance.BorderSize = 0
+    $btnCancel.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(78, 78, 82)
+    $btnCancel.BackColor = $cBorder; $btnCancel.ForeColor = $cTextPrimary
+    $btnCancel.Font = [Drawing.Font]::new("Segoe UI", 10)
+    $btnCancel.Cursor = [Windows.Forms.Cursors]::Hand
+    $bp.Controls.Add($btnCancel); $dlg.CancelButton = $btnCancel
+
+    $dlg.Add_Shown({ try { [DarkTitleBar]::Enable($this.Handle); [DarkTitleBar]::ApplyDarkScrollbar($lv.Handle) } catch {} })
+    $dlg.Controls.AddRange(@($bar, $lblT, $lblI, $lv, $bp))
+    $r = $dlg.ShowDialog()
+    if ($r -eq [Windows.Forms.DialogResult]::OK) { return @{ Action = 'ok'; CpDemande = $lv.SelectedItems[0].Text } }
+    if ($r -eq [Windows.Forms.DialogResult]::Ignore) { return @{ Action = 'ignore' } }
     return $null
 }
 
@@ -624,6 +741,88 @@ DIRECTION SERVICES NUMERIQUES<br/>
 "@
 }
 
+# Mail au demandeur quand des homonymes sont détectés (autres CP pour le même nom).
+# Corps commun à l'aperçu et au mail final ; $cpTrouves = CP séparés par des virgules.
+$global:UrlDepartDefinitif = 'https://sncf.service-now.com/portail?id=sncf_sc_cat_item_detail&sys_id=b702104ac345a150dde6d4c4e40131d8&sysparm_category=037441a51bcb0410043385506e4bcb15'
+function Get-CorpsHomonymeContenu {
+    param($nomPrenom, $cpDemande, $cpTrouves, $cheminHeader, $cheminSignature)
+    $enc = { param($t) [System.Net.WebUtility]::HtmlEncode([string]$t) }
+    $libTrouve = if (([string]$cpTrouves).Contains(',')) { 'CP trouvés' } else { 'CP trouvé' }
+    $lien = [System.Net.WebUtility]::HtmlEncode($global:UrlDepartDefinitif)
+    return @"
+<table style='width:100%'><tr>
+<td style='width:140px; vertical-align:top;'><img src='file:///$cheminHeader' style='width:130px;'/></td>
+<td style='vertical-align:top; padding-left:25px;'>
+<p>Bonjour,</p>
+<p>Nous traitons actuellement la déclaration de mouvement pour <b>$(& $enc $nomPrenom)</b>.</p>
+<p>Après vérification dans nos outils, nous constatons que nous avons d'autres CP pour ce bénéficiaire.</p>
+<p>- CP que vous nous avez communiqué : <b>$(& $enc $cpDemande)</b><br/>
+- $libTrouve : <b>$(& $enc $cpTrouves)</b></p>
+<p>Pourriez-vous nous indiquer s'il s'agit d'un homonyme ou s'il s'agit d'un changement de statut ?</p>
+<p>Si c'est un ancien compte, nous vous invitons à déclarer le départ définitif, en utilisant le formulaire ci-dessous :<br/>
+<a href='$lien'>$lien</a></p>
+<p>Vous remerciant par avance de votre retour.</p>
+<div style='margin-top:20px; font-size:13px;'>
+Cordialement,<br/>
+<b>Votre Assistance Bureautique.</b><br/>
+<img src='file:///$cheminSignature' style='width:330px; margin-top:12px;'/>
+</div>
+</td></tr></table>
+"@
+}
+
+function Get-CorpsMessageHTML_Homonyme_Preview {
+    param($objet, $nomPrenom, $cpDemande, $cpTrouves, $cheminHeader, $cheminSignature)
+    $contenu = Get-CorpsHomonymeContenu $nomPrenom $cpDemande $cpTrouves $cheminHeader $cheminSignature
+    $objetHtml = [System.Net.WebUtility]::HtmlEncode([string]$objet)
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 14px; margin: 0; padding: 0; background: #1E1E1E;
+        scrollbar-base-color: #1E1E1E; scrollbar-face-color: #555; scrollbar-track-color: #252526;
+        scrollbar-arrow-color: #808080; scrollbar-highlight-color: #555; scrollbar-shadow-color: #1E1E1E;
+        scrollbar-3dlight-color: #252526; scrollbar-darkshadow-color: #1E1E1E; }
+    .sujet-preview { background: #2D2D30; border-left: 3px solid #E84393; color: #E84393; font-size: 15px;
+        font-weight: bold; padding: 10px 15px; margin: 12px 12px 0 12px; }
+    hr.sujet { border: 0; border-top: 1px solid #3E3E42; margin: 0 12px; }
+    .email-body { background: #fff; padding: 20px; margin: 0 12px 12px 12px; }
+    .email-body p { margin: 8px 0; color: #333; }
+    .email-body a { color: #0066cc; text-decoration: underline; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class='sujet-preview'>$objetHtml</div>
+<hr class='sujet'/>
+<div class='email-body'>
+$contenu
+</div>
+</body>
+</html>
+"@
+}
+
+function Get-CorpsMessageHTML_Homonyme_Final {
+    param($nomPrenom, $cpDemande, $cpTrouves, $cheminHeader, $cheminSignature)
+    $contenu = Get-CorpsHomonymeContenu $nomPrenom $cpDemande $cpTrouves $cheminHeader $cheminSignature
+    return @"
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 14px; margin: 20px; }
+    p { margin: 8px 0; }
+    a { color: #0066cc; text-decoration: underline; }
+</style>
+</head>
+<body>
+$contenu
+</body>
+</html>
+"@
+}
+
 # --- Interface principale (thème sombre LixiSpace) ---
 $form = New-Object Windows.Forms.Form
 $form.Text = "Arrivée Collaborateur"
@@ -759,6 +958,31 @@ $txtNomPrenom = New-Object Windows.Forms.TextBox
 $txtNomPrenom.Location = New-Object Drawing.Point($col1In, 55); $txtNomPrenom.Width = $inW
 $txtNomPrenom.BackColor = $cSurface; $txtNomPrenom.ForeColor = $cTextPrimary
 $txtNomPrenom.BorderStyle = 'FixedSingle'; $txtNomPrenom.Font = [Drawing.Font]::new("Segoe UI", 10)
+
+# Ligne 2, colonne 2 : vérification d'homonymes dans ServiceNow (page cachée).
+# Lancée automatiquement ~1 s après la saisie du nom ; le bouton la relance.
+$btnVerifHomo = New-Object Windows.Forms.Button
+$btnVerifHomo.Text = "Vérif. homonymes"
+$btnVerifHomo.Location = New-Object Drawing.Point($col2Lbl, 53)
+$btnVerifHomo.Size = New-Object Drawing.Size(140, 28)
+$btnVerifHomo.FlatStyle = 'Flat'
+$btnVerifHomo.FlatAppearance.BorderSize = 1
+$btnVerifHomo.FlatAppearance.BorderColor = $cBorder
+$btnVerifHomo.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(62, 62, 66)
+$btnVerifHomo.BackColor = $cSurface; $btnVerifHomo.ForeColor = $cTextPrimary
+$btnVerifHomo.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+$btnVerifHomo.Cursor = [Windows.Forms.Cursors]::Hand
+
+# État de la vérification. En cas d'homonymes : pastille rose bien visible,
+# cliquable pour choisir le CP demandé.
+$lblHomo = New-Object Windows.Forms.Label
+$lblHomo.Location = New-Object Drawing.Point($col2In, 53)
+$lblHomo.Size = New-Object Drawing.Size($inW, 28)
+$lblHomo.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+$lblHomo.AutoEllipsis = $true
+$lblHomo.Padding = New-Object Windows.Forms.Padding(6, 0, 0, 0)
+$lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9)
+$global:TipHomo = New-Object Windows.Forms.ToolTip
 
 # Images (droite du panneau)
 $picHeader = New-Object Windows.Forms.PictureBox
@@ -926,7 +1150,7 @@ $txtJoursInit.Add_KeyDown({
 $txtJoursInit.Add_TextChanged({ Update-DateInitCalculee; Update-Preview })
 Update-DateInitCalculee
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$btnVerifHomo,$lblHomo,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -946,6 +1170,11 @@ function Layout-FormPanel {
     $lblEmail.Left = $c2x
     $txtEmail.Left = $c2x + $labelW
     $txtEmail.Width = $inW
+
+    # Ligne 2, colonne 2 : bouton homonymes (colonne des libellés) + état aligné sur les champs.
+    $btnVerifHomo.Left = $c2x
+    $lblHomo.Left = $c2x + $labelW
+    $lblHomo.Width = $inW
 
     # Ligne 3, colonne 2 : décompte de jours + date calculée, alignés sur l'e-mail.
     $lblDateInit.Left = $c2x
@@ -1009,6 +1238,10 @@ $btnReset.ForeColor = $cTextPrimary
 $btnReset.Font = [Drawing.Font]::new("Segoe UI", 10, [Drawing.FontStyle]::Bold)
 $btnReset.Cursor = [Windows.Forms.Cursors]::Hand
 $btnReset.Add_Click({
+    Set-ModeHomonyme $false
+    $global:HomoIgnore = $null
+    $global:HomoComptes = @()
+    $global:HomoDernierNom = $null
     $txtRITM.Text = ""
     $txtEmail.Text = ""
     $txtNomPrenom.Text = ""
@@ -1051,7 +1284,25 @@ $global:CopyEmailBenef = "(à définir)"
 
 $global:CopyDateInit = $null
 
+# Mode « homonymes » : actif quand ServiceNow renvoie plusieurs comptes au même nom.
+$global:ModeHomonyme = $false
+$global:HomoComptes = @()        # comptes portant exactement le nom saisi
+$global:HomoCpDemande = $null    # CP communiqué dans la RITM (choisi par l'opérateur)
+$global:HomoIgnore = $null       # nom normalisé pour lequel l'opérateur a écarté l'alerte
+$global:HomoDernierNom = $null   # dernier nom envoyé à la vérification
+
 function Get-CopyBlockText {
+    if ($global:ModeHomonyme) {
+        $cp = if ($global:HomoCpDemande) { $global:HomoCpDemande } else { "(à choisir)" }
+        $trouves = (Get-CpTrouves $global:HomoComptes $global:HomoCpDemande) -join ', '
+        if (-not $global:HomoCpDemande) { $trouves = "(à choisir)" }
+        return @(
+            "***Homonyme détecté***",
+            "CP demandé > $cp",
+            "CP trouvé(s) > $trouves",
+            "Mail envoyé au demandeur, en attente de retour"
+        ) -join "`r`n"
+    }
     if ($global:CopyDateInit) {
         $header = "***Vérifications Mon-AD : Mot de passe déjà initialisé le $($global:CopyDateInit)***"
     } else {
@@ -1071,7 +1322,9 @@ function Get-CopyBlockText {
 # Message de clôture à destination du demandeur (« Note Utilisateur »).
 # Le texte change selon le mode (case « Mot de passe déjà initialisé »).
 function Get-MessageDemandeurText {
-    if ($chkMdpDejaInit.Checked) {
+    if ($global:ModeHomonyme) {
+        $corps = "Nous avons constaté la présence d'autres CP pour ce bénéficiaire. Un mail vous a été envoyé afin de savoir s'il s'agit d'un homonyme ou d'un changement de statut. Nous restons dans l'attente de votre retour."
+    } elseif ($chkMdpDejaInit.Checked) {
         $corps = "Le compte est bien activé. Le mot de passe n'a pas été modifié, car il avait déjà été initialisé."
     } else {
         $corps = "Le compte a bien été activé. Le mot de passe a été envoyé par mail au demandeur."
@@ -1333,7 +1586,13 @@ if ($global:Ctx.State.PreviewCollapsed) { Set-PreviewCollapsed $true }
 function Update-Preview {
     $ritm = if($txtRITM.Text){$txtRITM.Text}else{"RITMXXXXX"}
     $nomPrenom = if($txtNomPrenom.Text){$txtNomPrenom.Text}else{"Prénom NOM"}
-    if ($chkMdpDejaInit.Checked) {
+    if ($global:ModeHomonyme) {
+        $objet = "$ritm - Vérification homonyme $nomPrenom"
+        $txtSubjectPreview.Text = $objet
+        $cpD = if ($global:HomoCpDemande) { $global:HomoCpDemande } else { "(à choisir)" }
+        $cpT = if ($global:HomoCpDemande) { (Get-CpTrouves $global:HomoComptes $global:HomoCpDemande) -join ', ' } else { "(à choisir)" }
+        $html = Get-CorpsMessageHTML_Homonyme_Preview $objet $nomPrenom $cpD $cpT $cheminHeader $cheminSignature
+    } elseif ($chkMdpDejaInit.Checked) {
         # Décompte non exploitable : l'aperçu montre un gabarit plutôt qu'une fausse date.
         $dateInit = Get-DateInitSaisie
         if (-not $dateInit) { $dateInit = "jj/mm/aaaa" }
@@ -1348,6 +1607,167 @@ function Update-Preview {
     $rtbMsg.Text = Get-MessageDemandeurText
     $webBrowser.DocumentText = $html
 }
+
+# --- Vérification d'homonymes (lib/Homonymes.ps1) ---
+# Affiche l'état de la vérification à droite du bouton « Homonymes ».
+#   Etat : idle | info | auth | erreur | ok | homonyme | ignore
+function Set-StatutHomo {
+    param([string]$Etat, [string]$Texte)
+    $global:HomoEtat = $Etat
+    $lblHomo.Text = $Texte
+    $global:TipHomo.SetToolTip($lblHomo, $Texte)
+    $lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9)
+    $lblHomo.BackColor = $cBgSecondary
+    $lblHomo.Cursor = [Windows.Forms.Cursors]::Default
+    switch ($Etat) {
+        'ok'       { $lblHomo.ForeColor = $cSuccess }
+        'auth'     { $lblHomo.ForeColor = $cWarning; $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
+        'erreur'   { $lblHomo.ForeColor = $cDanger;  $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
+        'ignore'   { $lblHomo.ForeColor = $cHomonyme; $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand }
+        'homonyme' {
+            $lblHomo.BackColor = $cHomonyme; $lblHomo.ForeColor = $cWhite
+            $lblHomo.Font = [Drawing.Font]::new("Segoe UI", 9, [Drawing.FontStyle]::Bold)
+            $lblHomo.Cursor = [Windows.Forms.Cursors]::Hand
+        }
+        default    { $lblHomo.ForeColor = $cTextSecondary }
+    }
+}
+
+# Bascule le formulaire en « mail au demandeur » : seule la génération du mail
+# reste active (pas de mot de passe, pas de vérification Mon-AD / OU).
+function Set-ModeHomonyme {
+    param([bool]$Actif)
+    if ([bool]$global:ModeHomonyme -ne $Actif) {
+        $global:ModeHomonyme = $Actif
+        if ($Actif) {
+            if ($chkMdpDejaInit.Checked) { $chkMdpDejaInit.Checked = $false }
+            $chkMdpDejaInit.Enabled = $false
+            $btnGenPwd.Enabled = $false
+            $btnGenPwd.BackColor = $cBorder
+            $btnGenMsg.Text = "Générer mail homonyme"
+            $btnGenMsg.BackColor = $cHomonyme
+            $btnGenMsg.FlatAppearance.MouseOverBackColor = $cHomonymeHover
+            $btnGenMsg.Enabled = $true
+            $txtSubjectPreview.ForeColor = $cHomonyme
+        } else {
+            $global:HomoCpDemande = $null
+            $chkMdpDejaInit.Enabled = $true
+            $btnGenPwd.Enabled = $true
+            $btnGenPwd.BackColor = $cAccentViolet
+            $btnGenMsg.Text = "Générer .msg + Maj note Snow"
+            $btnGenMsg.BackColor = $cAccentBlue
+            $btnGenMsg.FlatAppearance.MouseOverBackColor = $cAccentBlueHover
+            $btnGenMsg.Enabled = ($txtPwd.Text -ne "")
+            $txtSubjectPreview.ForeColor = $cAccentViolet
+        }
+    }
+    $rtbCopy.Text = Get-CopyBlockText
+    Update-Preview
+}
+
+# Texte de la pastille rose selon que le CP demandé a été choisi ou non.
+function Update-StatutHomonyme {
+    $n = @($global:HomoComptes).Count
+    if ($global:HomoCpDemande) {
+        $tr = (Get-CpTrouves $global:HomoComptes $global:HomoCpDemande) -join ', '
+        Set-StatutHomo 'homonyme' "⚠ HOMONYMES : $($global:HomoCpDemande) / $tr"
+        $global:TipHomo.SetToolTip($lblHomo, "Homonymes détectés`r`nCP demandé : $($global:HomoCpDemande)`r`nCP trouvé(s) : $tr`r`nCliquer pour modifier le choix.")
+    } else {
+        Set-StatutHomo 'homonyme' "⚠ $n HOMONYMES DÉTECTÉS (cliquer)"
+        $global:TipHomo.SetToolTip($lblHomo, "$n comptes portent ce nom dans ServiceNow.`r`nCliquer pour désigner le CP communiqué dans la RITM.")
+    }
+}
+
+# Résultat ServiceNow : comptes ramenés pour le nom vérifié.
+function Set-ResultatHomonymes {
+    param([string]$NomPrenom, $Records)
+    if ($NomPrenom -ne $txtNomPrenom.Text.Trim()) { return }   # nom modifié entre-temps
+    $comptes = @(Select-Homonymes $Records $NomPrenom)
+    $global:HomoComptes = $comptes
+    $global:HomoCpDemande = $null
+    if (Test-PresenceHomonymes $comptes) {
+        Write-AppLog "[HOMO] Homonymes pour « $NomPrenom » : $(($comptes | ForEach-Object { $_.user_name }) -join ', ')"
+        if ($global:HomoIgnore -eq (ConvertTo-NomNormalise $NomPrenom)) {
+            Set-ModeHomonyme $false
+            Set-StatutHomo 'ignore' "Homonymes écartés ($($comptes.Count) comptes) — cliquer pour revoir"
+            return
+        }
+        Set-ModeHomonyme $true
+        Update-StatutHomonyme
+    } else {
+        Set-ModeHomonyme $false
+        if ($comptes.Count -eq 1) { Set-StatutHomo 'ok' "✔ Pas d'homonyme (CP $($comptes[0].user_name))" }
+        else { Set-StatutHomo 'ok' "✔ Pas d'homonyme (aucun compte à ce nom)" }
+    }
+}
+
+# Lance (ou relance avec -Force) la vérification pour le nom saisi.
+function Invoke-VerifHomonymes {
+    param([switch]$Force)
+    $nom = $txtNomPrenom.Text.Trim()
+    if (-not (Get-RequeteHomonymes $nom)) {
+        $global:HomoDernierNom = $null
+        $global:HomoComptes = @()
+        Set-ModeHomonyme $false
+        Set-StatutHomo 'idle' 'Saisir le nom et le prénom'
+        return
+    }
+    if (-not $Force -and $nom -eq $global:HomoDernierNom) { return }
+    $global:HomoDernierNom = $nom
+    if ($global:Homo.Phase -eq 'off') {
+        Initialize-HomonymeEngine -LibDir (Join-Path $baseDir 'lib\webview2') -DataDir $dataDir `
+            -OnResultat { param($n, $r) Set-ResultatHomonymes $n $r } `
+            -OnStatut { param($etat, $texte) if ($global:HomoEtat -ne 'homonyme' -or $etat -ne 'info') { Set-StatutHomo $etat $texte } }
+    }
+    Start-VerifHomonymes $nom
+}
+
+# Choix du CP demandé parmi les homonymes. Renvoie $true si un CP est retenu.
+function Open-ChoixHomonyme {
+    $choix = Show-HomonymesDialog $global:HomoComptes $txtNomPrenom.Text.Trim() $global:HomoCpDemande
+    if (-not $choix) { return [bool]$global:HomoCpDemande }
+    if ($choix.Action -eq 'ignore') {
+        $global:HomoIgnore = ConvertTo-NomNormalise $txtNomPrenom.Text
+        Set-ModeHomonyme $false
+        Set-StatutHomo 'ignore' "Homonymes écartés ($(@($global:HomoComptes).Count) comptes) — cliquer pour revoir"
+        return $false
+    }
+    $global:HomoCpDemande = $choix.CpDemande
+    Update-StatutHomonyme
+    $rtbCopy.Text = Get-CopyBlockText
+    Update-Preview
+    return $true
+}
+
+# Saisie du nom : vérification différée (~1,2 s après la dernière frappe).
+$timerHomo = New-Object Windows.Forms.Timer
+$timerHomo.Interval = 1200
+$timerHomo.Add_Tick({
+    $timerHomo.Stop()
+    try { Invoke-VerifHomonymes } catch { Write-AppLog "[HOMO] Vérification KO : $($_.Exception.Message)"; Set-StatutHomo 'erreur' 'Vérification impossible (cliquer pour relancer)' }
+}.GetNewClosure())
+$txtNomPrenom.Add_TextChanged({
+    # Le nom change : l'alerte précédente ne s'applique plus.
+    if ($global:ModeHomonyme) { Set-ModeHomonyme $false }
+    if ($txtNomPrenom.Text.Trim() -ne $global:HomoDernierNom) {
+        $global:HomoCpDemande = $null
+        if ($global:HomoEtat -ne 'auth') { Set-StatutHomo 'idle' $(if (Get-RequeteHomonymes $txtNomPrenom.Text) { 'Vérification à venir…' } else { 'Saisir le nom et le prénom' }) }
+    }
+    $timerHomo.Stop(); $timerHomo.Start()
+}.GetNewClosure())
+
+$btnVerifHomo.Add_Click({
+    try { Invoke-VerifHomonymes -Force } catch { Write-AppLog "[HOMO] Vérification KO : $($_.Exception.Message)"; Set-StatutHomo 'erreur' 'Vérification impossible (cliquer pour relancer)' }
+})
+$lblHomo.Add_Click({
+    switch ($global:HomoEtat) {
+        'homonyme' { [void](Open-ChoixHomonyme) }
+        'ignore'   { $global:HomoIgnore = $null; Set-ModeHomonyme $true; Update-StatutHomonyme; [void](Open-ChoixHomonyme) }
+        'erreur'   { Invoke-VerifHomonymes -Force }
+        'auth'     { Show-HomoAuth }
+    }
+})
+Set-StatutHomo 'idle' 'Saisir le nom et le prénom'
 
 # --- Événements ---
 $btnGenPwd.Add_Click({
@@ -1371,6 +1791,30 @@ $btnGenMsg.Add_Click({
     $ritm = $txtRITM.Text.Trim(); $nomPrenom = $txtNomPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
     if ($ritm -eq "" -or $nomPrenom -eq "" -or $dest -eq "") {
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
+        return
+    }
+
+    if ($global:ModeHomonyme) {
+        # --- Mode : homonymes détectés -> mail au demandeur, sans PJ ---
+        # Pas de mot de passe, pas de vérification Mon-AD / OU, pas de saisie bénéficiaire.
+        if (-not $global:HomoCpDemande) {
+            if (-not (Open-ChoixHomonyme)) { return }
+        }
+        $cpTrouves = (Get-CpTrouves $global:HomoComptes $global:HomoCpDemande) -join ', '
+        $objet = "$ritm - Vérification homonyme $nomPrenom"
+        $htmlFinal = Get-CorpsMessageHTML_Homonyme_Final $nomPrenom $global:HomoCpDemande $cpTrouves $cheminHeader $cheminSignature
+        $webBrowser.DocumentText = Get-CorpsMessageHTML_Homonyme_Preview $objet $nomPrenom $global:HomoCpDemande $cpTrouves $cheminHeader $cheminSignature
+        $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
+        if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
+            Write-AppLog "[HOMO] Mail homonyme créé pour $ritm (demandé $($global:HomoCpDemande), trouvé $cpTrouves)."
+            $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
+            $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
+            if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
+                Invoke-Item $cheminMsg
+                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+            }
+        }
+        $rtbCopy.Text = Get-CopyBlockText
         return
     }
 
@@ -1859,6 +2303,13 @@ $miAutoHideBub.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) 
 $bubbleMenu.add_Opening({ $miAutoHideBub.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
 
 $form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
+# Fermeture : libère le WebView2 caché (et ses processus msedgewebview2).
+# Dispose() plutôt que Close() : Close passerait par FormClosing qui re-cache la fenêtre.
+$form.Add_FormClosed({
+    try { if ($global:Homo.Timer) { $global:Homo.Timer.Stop() } } catch { }
+    try { if ($global:Homo.WebView) { $global:Homo.WebView.Dispose() } } catch { }
+    try { if ($global:Homo.Form) { $global:Homo.Form.Dispose() } } catch { }
+})
 
 # Démarrage TOUJOURS centré sur l'écran principal — UNE SEULE fois (sinon le re-Show
 # de la languette recentrerait l'app au lieu de la laisser glisser).
