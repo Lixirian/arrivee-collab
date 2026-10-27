@@ -31,7 +31,7 @@ Le canal de distribution est le dépôt GitHub public **`Lixirian/arrivee-collab
 1. **Incrémenter la version** dans `ArriveeCollab-PS/config.ps1` (`$Config.Version`, format `X.Y.Z` : mineur pour une fonctionnalité, patch pour un correctif).
 2. **Ajouter l'entrée changelog** correspondante en tête de `ArriveeCollab-PS/releases.json` (mêmes numéros de version ; ces notes alimentent le dialogue de la pastille et le « Quoi de neuf »). Rédiger pour l'utilisateur final, en français.
 3. Si le **contenu du tutoriel** a changé (`lib/Tutorial.ps1`), mettre à jour le texte des étapes ; incrémenter `$script:TutorialVersion` seulement si le tutoriel doit se ré-afficher à tous.
-3 bis. **Fiches DSI / cybersécurité** (`..\Arrivee collab - Note DSI\` : « Note DSI - Arrivée Collaborateur.docx » et « Fiche cybersécurité - Arrivée Collaborateur.docx », **hors dépôt public**, diffusion restreinte pour la fiche cyber) : relire ce que la version change (sécurité, flux, données, installation, lanceur), mettre à jour le contenu et la ligne « Version de l'outil : X » / « Version analysée : X » (retouches dans Word, après sauvegarde ; empreintes SHA-256 du lanceur en annexe si `dist-launcher/` a changé). **Le build refuse de publier si ces versions ne correspondent pas** (`-SkipDocCheck` pour passer outre). Ne jamais les commiter dans le dépôt.
+3 bis. **Fiches DSI / cybersécurité** (`..\Arrivee collab - Note DSI\` : « Note DSI », « Fiche cybersécurité », « Dossier technique » et « Fiche données et accès » (celle envoyée au guichet Cyber / SOC, soc@sncf.fr : données stockées + accès utilisés) - Arrivée Collaborateur.docx, **hors dépôt public**, diffusion restreinte pour la fiche cyber ; le build contrôle TOUS les .docx du dossier ; générés par Word COM via les scripts de `..\Arrivee collab - Note DSI\Sources\` : fiches.ps1, dossier-technique.ps1, fiche-donnees-acces.ps1 — y mettre à jour `$ver` et le contenu puis les relancer) : relire ce que la version change (sécurité, flux, données, installation, lanceur), mettre à jour le contenu et la ligne « Version de l'outil : X » / « Version analysée : X » (retouches dans Word, après sauvegarde ; empreintes SHA-256 du lanceur en annexe si `dist-launcher/` a changé). **Le build refuse de publier si ces versions ne correspondent pas** (`-SkipDocCheck` pour passer outre). Ne jamais les commiter dans le dépôt.
 4. **Lancer les tests** : `powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1` — tout doit passer.
 5. **Builder et publier** : `.\build-zip.ps1` — génère `Arrivee-Collab_version<X>.zip` + `latest.json`, archive l'ancien zip dans `Archives\`, régénère `dist-ready\`, puis **commit + push automatiquement sur `origin`**, à la fois sur la branche de travail et sur la **branche de publication lue par les apps** (`$Config.UpdateBranch`, donc `main`). Le script termine par un contrôle `git ls-remote` et affiche **`PUBLICATION OK`** seulement si `origin/main` porte bien ce build ; en cas de `PUBLICATION KO` (branche divergente, hors ligne), **rien n'est distribué** — appliquer le rattrapage affiché (`git merge -s ours origin/main` puis `git push origin HEAD:main`). Une fois OK, les apps voient la nouvelle version sous ~5 minutes. Aucun transfert manuel.
    - Si le build échoue sur `Le processus ne peut pas accéder au fichier ... .zip` (verrou Synology Drive) : **relancer simplement `.\build-zip.ps1`**.
@@ -77,7 +77,7 @@ docs/superpowers/          ← specs et plans de conception
 L'app écrit toutes ses sorties sous `%LOCALAPPDATA%\Arrivee-Collab\` :
 - `app\` — copie de `ArriveeCollab-PS/` (écrasée lors des mises à jour par `lib/Update.ps1`)
 - `data\Mot de passe\` — .txt et .zip temporaires du mot de passe
-- `data\Archive message\` — .msg archivés après envoi
+- (plus d'archivage depuis 1.13.3 : le `{RITM}_notif.msg` est supprimé dès qu'Outlook le libère ; l'ancien `data\Archive message\` est purgé au démarrage)
 - `state.json` — état persistant (version installée…)
 - `app_debug.log` — journal de débogage
 
@@ -104,7 +104,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 4. Dialogue de vérification des actions pré-requises (Mon-AD, OU)
 5. Création d'un fichier `.msg` Outlook avec le ZIP en PJ et un corps HTML formaté SNCF (`Get-CorpsMessageHTML_Final`, saisies encodées HTML)
 6. **Suppression automatique** du .txt et du .zip (`Remove-FichiersMotDePasse`, aussi à la réinitialisation et à la fermeture ; purge complète de `Mot de passe/` au démarrage)
-7. Ouverture optionnelle du .msg + archivage dans `Archive message/` (script détaché `$script:WatcherArchivage`, chemins passés en **paramètres**, auto-suppression) ; les archives de plus de **30 jours** sont purgées au démarrage (`$global:RetentionArchivesJours`)
+7. Ouverture optionnelle du .msg puis **suppression** dès qu'Outlook le libère (script détaché `$script:WatcherSuppressionMsg`, 1 h max, chemin passé en **paramètre**, auto-suppression) : **aucun message conservé par l'outil** (copie de référence dans « Éléments envoyés »). Au démarrage : `*_notif.msg` de plus d'1 jour (« Plus tard ») supprimés, ancien dossier `Archive message/` vidé et supprimé
 8. Saisie des informations bénéficiaire (email, OU) → mise à jour de la note ServiceNow copiable
 
 **Mode « Mot de passe déjà initialisé »** (case `chkMdpDejaInit` cochée) : Mon-AD n'affiche pas une date mais le **nombre de jours restants avant expiration** du mot de passe (validité 365 jours, `$script:DureeValiditeMdp` dans `lib/Common.ps1`). L'utilisateur saisit donc ce nombre de jours (0 à 365) dans `$txtJoursInit` (chiffres uniquement, flèches ↑/↓ pour ajuster) et l'app calcule la **date d'initialisation** `aujourd'hui - (365 - X)` (`Get-DateInitDepuisJoursRestants`) affichée en temps réel dans `$lblDateCalc` — c'est cette date qui part dans le mail et la note. Ce mode désactive la génération de mot de passe et envoie un mail différent (`Get-CorpsMessageHTML_DejaInit_Final`) **sans PJ ZIP** indiquant que le compte possède déjà un mot de passe. Pas d'étape de vérification Mon-AD ni de nettoyage. La génération du .msg est bloquée si le décompte est vide ou invalide. La date est reportée dans l'en-tête de la note ServiceNow via `$global:CopyDateInit`.
@@ -126,7 +126,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 | `Creer-FichierMotDePasse` | Écrit le mot de passe dans un .txt |
 | `Creer-Zip` | Compresse le .txt dans un ZIP (via dossier temp `$env:TEMP\tempZipSNCF`) |
 | `Creer-FichierMsg` | Crée un .msg via COM Outlook |
-| `Attendre-FermetureOutlookEtDeplacer` | Lance un script PS en arrière-plan (max 30 tentatives, 2s d'intervalle) qui attend la libération du fichier .msg puis le déplace dans Archive |
+| `Attendre-FermetureOutlookEtSupprimer` | Lance un script PS en arrière-plan (jusqu'à 1 h, toutes les 2 s) qui attend la libération du fichier .msg par Outlook puis le supprime |
 | `Get-CorpsMessageHTML_Preview` / `_Final` | Génère le HTML du mail standard (Preview inclut l'objet + cadre sombre, Final = mail brut envoyé) |
 | `Get-CorpsMessageHTML_DejaInit_Preview` / `_Final` | Variantes pour le mode « mot de passe déjà initialisé » (mail « Mouvement d'un Agent SNCF », mentionne la date d'init **calculée**, pas de PJ) |
 | `Show-AlertDialog` | Boîte de dialogue dark theme (simple OK ou Oui/Non avec textes personnalisables) |
@@ -158,7 +158,7 @@ L'événement `btnGenMsg.Add_Click` (vers la fin du PS1) se scinde en **deux mod
 - `ArriveeCollab-PS/image-arrivee-collab.ico` — Icône de l'application (fenêtre principale + dialogues)
 - `ArriveeCollab-PS/Resources/` — Images embarquées dans le mail (`image arrivee collab.jpg` + `Signature.png`). **Obligatoire** au lancement.
 - `%LOCALAPPDATA%\Arrivee-Collab\data\Mot de passe\` — Fichiers temporaires (mot de passe .txt et .zip). Créé automatiquement.
-- `%LOCALAPPDATA%\Arrivee-Collab\data\Archive message\` — Stockage des .msg envoyés. Créé automatiquement.
+- `%LOCALAPPDATA%\Arrivee-Collab\data\Archive message\` — Ancien archivage (< 1.13.3), vidé et supprimé au démarrage.
 - `docs/superpowers/` — Spécifications et plans de conception (voir `specs/` et `plans/`).
 
 ## Dépendances système
@@ -197,4 +197,4 @@ Boutons : `FlatStyle = 'Flat'`, `BorderSize = 0`, police Segoe UI SemiBold. Barr
 - L'adresse expéditeur configurée est `noreply.dsnu.asut.asuidf@sncf.fr`
 - Les liens dans le template HTML pointent vers le SharePoint interne SNCF
 - Les variables globales utilisent le préfixe `$global:` (`$global:CheminZip`, `$global:CheminFichierTxt`, `$global:CopyOU`, `$global:CopyEmailBenef`, `$global:CopyDateInit`)
-- Le fichier .msg est nommé `{RITM}_notif.msg` dans `%LOCALAPPDATA%\Arrivee-Collab\` avant archivage
+- Le fichier .msg est nommé `{RITM}_notif.msg` dans `%LOCALAPPDATA%\Arrivee-Collab\`, supprimé une fois libéré par Outlook

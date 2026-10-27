@@ -134,7 +134,7 @@ $global:PrevStateVersion = [string]$global:Ctx.State.Version
 # Chemins dossiers et fichiers importants
 $resourcesFolder = Join-Path $baseDir "Resources"
 $motDePasseFolder = Join-Path $workDir "Mot de passe"
-$archiveFolder = Join-Path $workDir "Archive message"
+$archiveFolder = Join-Path $workDir "Archive message"   # ancien archivage (< 1.13.3), purgé au démarrage
 
 # --- Palette de couleurs (thème sombre style LixiSpace) ---
 $cBgMain       = [Drawing.Color]::FromArgb(30, 30, 30)
@@ -270,18 +270,21 @@ if (-not (Test-Path $resourcesFolder)) {
 }
 
 # Création automatique des sous-dossiers si nécessaire
-foreach ($folder in @($motDePasseFolder, $archiveFolder)) {
-    if (-not (Test-Path -LiteralPath $folder)) { New-Item -Path $folder -ItemType Directory | Out-Null }
-}
+if (-not (Test-Path -LiteralPath $motDePasseFolder)) { New-Item -Path $motDePasseFolder -ItemType Directory | Out-Null }
 
-# Hygiène des données sensibles au démarrage :
+# Hygiène des données sensibles au démarrage (aucun message n'est conservé par l'outil,
+# la copie de référence est dans « Éléments envoyés » d'Outlook) :
 #  - « Mot de passe » : .txt / .zip résiduels (génération abandonnée) => tout supprimer ;
-#  - « Archive message » : les .msg contiennent le mot de passe en pièce jointe =>
-#    conservés 30 jours seulement.
-$global:RetentionArchivesJours = 30
+#  - .msg préparés et jamais libérés (« Plus tard », Outlook resté ouvert) => supprimés
+#    après 1 jour ;
+#  - « Archive message » (archivage des versions < 1.13.3) => vidé puis supprimé.
 $nPurgeMdp = Remove-FichiersAnciens $motDePasseFolder 0
-$nPurgeArch = Remove-FichiersAnciens $archiveFolder $global:RetentionArchivesJours '*.msg'
-if ($nPurgeMdp -or $nPurgeArch) { Write-AppLog "[SECU] Purge au démarrage : $nPurgeMdp fichier(s) de mot de passe, $nPurgeArch archive(s) de plus de $($global:RetentionArchivesJours) jours." }
+$nPurgeMsg = Remove-FichiersAnciens $workDir 1 '*_notif.msg'
+$nPurgeArch = Remove-FichiersAnciens $archiveFolder 0
+if ((Test-Path -LiteralPath $archiveFolder) -and -not (Get-ChildItem -LiteralPath $archiveFolder -Force -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $archiveFolder -Force -ErrorAction SilentlyContinue
+}
+if ($nPurgeMdp -or $nPurgeMsg -or $nPurgeArch) { Write-AppLog "[SECU] Purge au démarrage : $nPurgeMdp fichier(s) de mot de passe, $nPurgeMsg message(s) préparé(s), $nPurgeArch ancienne(s) archive(s)." }
 
 # Chemins des images
 $cheminHeader = Join-Path $resourcesFolder 'image arrivee collab.jpg'
@@ -688,18 +691,18 @@ function Creer-FichierMsg ($sujet, $dest, $htmlBody, $zipPath, $sortie) {
         return $false
     }
 }
-# Archivage du .msg après fermeture dans Outlook : script détaché qui attend la
-# libération du fichier. Les chemins lui sont passés en PARAMÈTRES (jamais insérés
-# dans le code) et le script s'efface lui-même à la fin.
-$script:WatcherArchivage = @'
-param([string]$FileToWatch, [string]$ArchiveFolder)
+# Suppression du .msg une fois libéré par Outlook (message envoyé ou fermé) : AUCUN
+# message n'est conservé par l'outil (la copie de référence est dans « Éléments
+# envoyés »). Script détaché qui attend la libération du fichier (1 h au plus ; au-delà,
+# la purge du démarrage le supprime). Le chemin lui est passé en PARAMÈTRE (jamais
+# inséré dans le code) et le script s'efface lui-même à la fin.
+$script:WatcherSuppressionMsg = @'
+param([string]$FileToWatch)
 Start-Sleep -Seconds 5
-$archivePath = [System.IO.Path]::Combine($ArchiveFolder, [System.IO.Path]::GetFileName($FileToWatch))
-for ($attempts = 0; $attempts -lt 30; $attempts++) {
+for ($attempts = 0; $attempts -lt 1800; $attempts++) {
     try {
         $fs = [System.IO.File]::Open($FileToWatch, 'Open', 'ReadWrite', 'None'); $fs.Close(); $fs.Dispose()
-        if (Test-Path -LiteralPath $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
-        Move-Item -LiteralPath $FileToWatch -Destination $ArchiveFolder -Force
+        Remove-Item -LiteralPath $FileToWatch -Force
         break
     } catch {
         if (-not (Test-Path -LiteralPath $FileToWatch)) { break }
@@ -708,12 +711,12 @@ for ($attempts = 0; $attempts -lt 30; $attempts++) {
 }
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 '@
-function Attendre-FermetureOutlookEtDeplacer($cheminMsg) {
-    $tempScriptPath = Join-Path $env:TEMP ("ac_archive_" + [guid]::NewGuid().ToString('N') + ".ps1")
-    Set-Content -LiteralPath $tempScriptPath -Value $script:WatcherArchivage -Encoding UTF8
+function Attendre-FermetureOutlookEtSupprimer($cheminMsg) {
+    $tempScriptPath = Join-Path $env:TEMP ("ac_msg_" + [guid]::NewGuid().ToString('N') + ".ps1")
+    Set-Content -LiteralPath $tempScriptPath -Value $script:WatcherSuppressionMsg -Encoding UTF8
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     Start-Process -FilePath $ps -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
-        '-File', "`"$tempScriptPath`"", '-FileToWatch', "`"$cheminMsg`"", '-ArchiveFolder', "`"$archiveFolder`"")
+        '-File', "`"$tempScriptPath`"", '-FileToWatch', "`"$cheminMsg`"")
 }
 
 function Get-CorpsMessageHTML_Preview {
@@ -2295,7 +2298,7 @@ $btnGenMsg.Add_Click({
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
                 Invoke-Item -LiteralPath $cheminMsg
-                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+                Attendre-FermetureOutlookEtSupprimer $cheminMsg
             }
         }
         $rtbCopy.Text = Get-CopyBlockText
@@ -2320,7 +2323,7 @@ $btnGenMsg.Add_Click({
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
                 Invoke-Item -LiteralPath $cheminMsg
-                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+                Attendre-FermetureOutlookEtSupprimer $cheminMsg
             }
         }
         $rtbCopy.Text = Get-CopyBlockText
@@ -2345,7 +2348,7 @@ $btnGenMsg.Add_Click({
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
                 Invoke-Item -LiteralPath $cheminMsg
-                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+                Attendre-FermetureOutlookEtSupprimer $cheminMsg
             }
         }
         # Demander les informations du bénéficiaire
@@ -2380,7 +2383,7 @@ $btnGenMsg.Add_Click({
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
                 Invoke-Item -LiteralPath $cheminMsg
-                Attendre-FermetureOutlookEtDeplacer $cheminMsg
+                Attendre-FermetureOutlookEtSupprimer $cheminMsg
             }
         }
         # Demander les informations du bénéficiaire

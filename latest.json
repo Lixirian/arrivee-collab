@@ -1,11 +1,11 @@
 ﻿{
-    "version":  "1.13.2",
-    "zip":  "Arrivee-Collab_version1.13.2.zip",
-    "sha256":  "F5F212E8F312B154C03EA4542AE583EB02DEE33F12BD1D6D3AF51BFE0877074E",
-    "sig":  "OeYhWfcSScy6nIoHlIxdgK8RlDISbBSN2U5DrfmvuoKcXUSS0O8xFEGUqGmHokqNXFRFJZaHxJ5qZ3UyRtGhEycNW7itN+ctPnWqvcoFY4NtiX0vVBQ5UJ/f8J8OtMIlMxda4G+kKgQH/FAdLL3jRrErqbZ+KtkGb8q0igyIZfXUgBfiu/b4QPo1oKbE1H29YXa1jWSCrjcDXjE4B+yf8YKt0IsVs3HKooUeGzDu4AbE952U84AyJt3Iwojv/lP8kqsOYVy2XNnC0hpKo5Q53mTwcrz8RdBqFJOsyAH1nIpvukjwjEz5y3If9clMFwD2Ugo255vGrJTMfwd24psipjtkf5pAS7vSs/JiSEl+8jHmmWXBOryn4xSnbPmxbdUsBFRzLCIzALFo21T38KGZcXcFwmAkgnqMBH4KMrwH6FFFbai85j6uqp4BJdwDke9htobsNbS/n97Xz6NOC4StTokweCat1/ZeNbnUQw8lFcwbWy8f1xftAq1v5HKrTqqg",
-    "msig":  "m99VfrpN3CHDq24yqJ7eHvNziI+TeTuFTghwV8ToPoYgBYvHgvro59es2bNhETn8SI3zd0p2oUEIft4ocH9VZ8wCUn8SuHu/v9OtOnbJJIPI+6cSB5UTSuUl/KrECf7y4fYHOMLCKXxUvYKuheJsKohxGCSvjk5x5SlRTwXGgc6CkJ18JmQWr+uPAhuNrJAJJnQmi2n+Mk8RKKFU+gVFrQzhuQzmEohAcSQv0WqWahAfpb19FM4AK8l1/L/6qqw4SWFsWrYXjIF9A69xGyJx+zpy/ll1QoaxaTI9MLIAqiWbqCrCkp4wGIPgZnq9rIktPcwBaKzliyfGq03HLrW7/V/pnbSvjE2uLkN0nGdRQ+vVfjGxLbBAyaPi5lHSYNEjeaQN98Bn4+8+4gDbilBq4pak+Y2I6o5BuJWg1F4TEZgfVZPKx2Pw0IlmzrLnlpfTwePDWxCx7OualJrAtu9zgo96Spyuh/22v1mKmp72eVktzk+nV2hCowbdX0mzwgwR",
+    "version":  "1.13.3",
+    "zip":  "Arrivee-Collab_version1.13.3.zip",
+    "sha256":  "7E4A2546968AC6162D6EF030D46F6F5E9B4D552A5BEFBF6F21F0174FFBAB621B",
+    "sig":  "gFpXtHHmT5qpYSekQMsPX7uAr99XDyDHC0X7/xnJdXwceUh0Gom2e/viL1GyoIkEgG9q8MrF3ps7OoX28fwVDDDOAEf3ts1p4CQOWHlxMm55VT6X8ZXNC7ozVzZ4mp5K3MNJ2GDCQQQ2KDjhP8WBG1u/EwYWtyEWhP3LaOo5db32GO4UF8PeVXky5Y+UJWUx28VCbLoEiBBeexEjum1cIflel6BePoZeE0hlzRWqnQur/cpSQxdmBSMF16oTNu44Z/borSi5j2RX4RL9kALWtpFDBmP8gecwT8PDXEzocSmS53WJJEFCyCeHrb/7r/Mp0eppC4wPlkdv3IFOx46Z2Ebidcss4AQNawyFw4Y14TjiaBPRRvJmkdGRSPXTWQ8KvYow5CnkO+SVWjv6EYDLsQCecTMoCnH5ODGrah4JZ4b5fbazD5kUoswgfq6dN6ezBBiEFK+siotW+FMZ4wp1FEIlI7zoxfpWrR8F5eWVGqWOgIqDixi9JhcOzrm/qEVv",
+    "msig":  "clEoV5aPX/uO6CiwjBpeY06aRHgkV8pdE1ma5IUDbbKfQs0j9f2OkMhVeL56+0CUpVszduFIneueH2u5UsuXNgv/yTp7oWir8zhpC10R42xMN0IX9opoExPDBEW7+vlfAOl16e7D1aI9Zx3EIPeRovun+4as52PIh0yZHYoI097t+8QA7O5YAjFEhzQyAw4SzpGYTGESKKT2M9Nfxbag0qJSPC00UfcJSqFwHwgJLZLZJgv4ewI9huRvH08Qx1vN/SF2BmpJnrQE2zOHimoE5ZBB8KS+PCyPUcNslt5HDHmT/2OhBmU7iIDIhs6qX3tfC/G6xCCzG5v9Wej1LyEbV5pLT8BKERnZ3GpKyNJmp1GGCG/DkZqgu7yuGYh/p2Q7GtwnIsMhU6VHjFhJwdtAdlKzM/bzrfllcW4hVFDapDzfgJ7BBkMwOrI8fqy+f5V1+3ZCfF4SZT1TWX0pfAlhIqHryvK7F8E44Z37Tvv8EYOwLE8mvdeHvRPU/aNM6l0T",
     "date":  "2026-10-27",
     "notes":  [
-                  "Lanceur en un seul fichier : « Arrivee Collab.cmd » fonctionne désormais seul, posé n\u0027importe où (bureau, dossier OneDrive…), sans fichier .vbs ni bootstrap.ps1 à côté. Corrige l\u0027erreur « Impossible de trouver le fichier script … Arrivee Collab.vbs » au lancement depuis un autre poste."
+                  "Plus aucun message conservé par l\u0027outil : le mail préparé (.msg) est supprimé dès qu\u0027Outlook le libère (après envoi ou fermeture) ; la copie de référence reste dans vos Éléments envoyés. Les anciens messages archivés sont supprimés au prochain démarrage."
               ]
 }

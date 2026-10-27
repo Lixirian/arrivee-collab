@@ -1,4 +1,7 @@
 ﻿{
+    "1.13.3": [
+        "Plus aucun message conservé par l'outil : le mail préparé (.msg) est supprimé dès qu'Outlook le libère (après envoi ou fermeture) ; la copie de référence reste dans vos Éléments envoyés. Les anciens messages archivés sont supprimés au prochain démarrage."
+    ],
     "1.13.2": [
         "Lanceur en un seul fichier : « Arrivee Collab.cmd » fonctionne désormais seul, posé n'importe où (bureau, dossier OneDrive…), sans fichier .vbs ni bootstrap.ps1 à côté. Corrige l'erreur « Impossible de trouver le fichier script … Arrivee Collab.vbs » au lancement depuis un autre poste."
     ],

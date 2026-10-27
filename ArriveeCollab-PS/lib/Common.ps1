@@ -15,7 +15,7 @@ function Get-AppDataDir {
 }
 
 # Sous-dossier des données métier PERSISTANTES (survit aux MAJ) : <DataDir>\data.
-# Contient « Mot de passe\ », « Archive message\ » et le .msg temporaire.
+# Contient « Mot de passe\ » et le .msg temporaire (supprimé une fois libéré par Outlook).
 function Get-AppWorkDir {
     param([string]$DataDir)
     $dir = Join-Path $DataDir 'data'

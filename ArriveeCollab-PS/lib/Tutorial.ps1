@@ -36,7 +36,7 @@ function Get-TutorialSteps {
            Text  = "Avant de générer le .msg, l'outil vous demande de confirmer que vous avez bien modifié le mot de passe dans Mon-AD et déplacé le compte dans la bonne OU."
            Target = { $null } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4E7)); Title = 'Générer le .msg'
-           Text  = "Ce bouton crée l'e-mail Outlook de notification (avec le .zip en pièce jointe) et met à jour la note ServiceNow. Le .msg est archivé automatiquement après envoi (conservé 30 jours), et les fichiers temporaires du mot de passe sont supprimés aussitôt."
+           Text  = "Ce bouton crée l'e-mail Outlook de notification (avec le .zip en pièce jointe) et met à jour la note ServiceNow. Aucune copie n'est conservée par l'outil : le .msg est supprimé dès qu'Outlook le libère (la copie reste dans vos Éléments envoyés), et les fichiers temporaires du mot de passe sont supprimés aussitôt."
            Target = { $btnGenMsg } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F464)); Title = 'Informations bénéficiaire'
            Text  = "Après la création du .msg, une fenêtre vous demande l'adresse de messagerie et l'OU du bénéficiaire (liste déroulante des entités SudEst) pour compléter la note ServiceNow."
