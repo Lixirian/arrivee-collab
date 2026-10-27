@@ -14,6 +14,9 @@ param([int]$WaitPid = 0)
 $ErrorActionPreference = 'Stop'
 $Repo    = 'Lixirian/arrivee-collab'   # dépôt GitHub public de distribution
 $Branch  = 'main'
+# Clé PUBLIQUE de l'éditeur (inscrite par build-zip.ps1 -NewSigningKey, identique à
+# config.ps1) : aucun zip n'est installé sans empreinte SHA-256 + signature valides.
+$ReleasePublicKey = '<RSAKeyValue><Modulus>raIRN/8SJiSaul7c49MAezHpVdn+NqrVeiWVGITIrSYg8vnPJV6OUndLedwPAq8+JnsVJdzeublKQJ4gpsW7slTiBYMgHoP36anKfQVi5HvH3NxFIG0nEYUuXTwBI69ffiM6PnmgRWM4D0JaoKDy45PugMg48YQ7av2yfjzZrBAKHEUL3kYEomblDASWhHYqHFM/o1wt7y0qzHZ60cTgNJXTwLD0u50Hv/VRjorFbkm/AmgOfkG/wDFisdt2AiQDVD9y5XeGoKemdG4LVTs/CRDxyHVwGoWSMoIeR9AHYD4FQAuK4IG9as/LmbTqsOeBDxK1kXYaPoBmwhX7vt+j91U4EHXDf90s8yzfurWrP8Uaw3BDUJeFIiyTmcIj/9fQr5T7fMgsfm8p9Hz1mBXJXouHOxBJrYF5pFoLeOF8Sye9Sj6yAnWsIRYF0XkD0R4JwT+1txdtpO3SLdZwLy/pj40r5zUxAbf1yNfkYUSANfJHRgXxHUc5YwBTkxazJQCh</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>'
 $dist    = $PSScriptRoot
 $dataDir = Join-Path $env:LOCALAPPDATA 'Arrivee-Collab'
 $appDir  = Join-Path $dataDir 'app'
@@ -37,22 +40,44 @@ try {
         return $wc
     }
 
-    # Version cible (latest.json) : GITHUB d'abord, repli sur le fichier local.
-    $targetVer = $null; $zipName = $null; $srcMode = $null   # 'github' | 'dossier'
-    try {
-        $wc = New-BootWebClient
-        try { $raw = $wc.DownloadString("$rawBase/latest.json?nocache=$([DateTime]::UtcNow.Ticks)") } finally { $wc.Dispose() }
-        $j = $raw | ConvertFrom-Json
-        $targetVer = [string]$j.version; $zipName = [string]$j.zip; $srcMode = 'github'
-        L "latest.json GitHub : version $targetVer."
-    } catch { L "GitHub inaccessible ($($_.Exception.Message)) : repli sur le dossier local." }
-    if (-not $targetVer) {
+    # Version cible (latest.json) : release GitHub (immédiate), puis fichier du dépôt
+    # (raw, ~5 min de cache CDN), puis fichier posé à côté de ce script.
+    $targetVer = $null; $zipName = $null; $srcMode = $null; $j = $null   # 'github' | 'dossier'
+    foreach ($u in @("https://github.com/$Repo/releases/latest/download/latest.json?t=$([DateTime]::UtcNow.Ticks)",
+                     "$rawBase/latest.json?nocache=$([DateTime]::UtcNow.Ticks)")) {
+        try {
+            $wc = New-BootWebClient
+            try { $raw = $wc.DownloadString($u) } finally { $wc.Dispose() }
+            $j = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+            $srcMode = 'github'
+            L "latest.json GitHub ($u) : version $($j.version)."
+            break
+        } catch { L "latest.json GitHub KO ($u) : $($_.Exception.Message)" }
+    }
+    if (-not $j) {
         $mf = Join-Path $dist 'latest.json'
         if (Test-Path -LiteralPath $mf) {
-            try { $j = (Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json); $targetVer = [string]$j.version; $zipName = [string]$j.zip; $srcMode = 'dossier' } catch { L "latest.json illisible : $($_.Exception.Message)" }
+            try { $j = (Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json); $srcMode = 'dossier' } catch { L "latest.json illisible : $($_.Exception.Message)" }
         }
     }
-    if (-not $zipName -and $targetVer) { $zipName = "Arrivee-Collab_version$targetVer.zip" }
+    # Version au format strict ; nom du zip RECONSTRUIT (jamais repris du manifeste).
+    if ($j -and ([string]$j.version) -match '^\d{1,4}(\.\d{1,4}){1,3}$') {
+        $targetVer = [string]$j.version
+        $zipName = "Arrivee-Collab_version$targetVer.zip"
+    } elseif ($j) { L "latest.json : version invalide « $($j.version) »." }
+
+    # Empreinte SHA-256 + signature RSA de l'éditeur sur « Arrivee-Collab|<version>|<SHA> ».
+    function Test-BootPackage([string]$ZipPath) {
+        if (-not $ReleasePublicKey) { return 'clé publique absente du lanceur' }
+        $sha = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        if (-not $j.sha256 -or $sha -ne ([string]$j.sha256).ToUpperInvariant()) { return "empreinte SHA-256 invalide (obtenu $sha)" }
+        try {
+            $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider((New-Object System.Security.Cryptography.CspParameters 24))
+            $rsa.FromXmlString($ReleasePublicKey)
+            if ($rsa.VerifyData([Text.Encoding]::UTF8.GetBytes("Arrivee-Collab|$targetVer|$sha"), 'SHA256', [Convert]::FromBase64String([string]$j.sig))) { return $null }
+        } catch { }
+        return 'signature de l''éditeur absente ou invalide'
+    }
 
     # PREMIÈRE INSTALLATION uniquement. Ensuite, les MAJ se font VIA LA PASTILLE in-app
     # (qui interroge aussi GitHub) : on ne force pas la MAJ au lancement, sinon la
@@ -64,16 +89,27 @@ try {
             $zip = $null
             if ($srcMode -eq 'github') {
                 $dlZip = Join-Path $env:TEMP ('acboot_' + [guid]::NewGuid().ToString('N') + '.zip')
-                try {
-                    $wc = New-BootWebClient
-                    try { $wc.DownloadFile("$rawBase/$zipName", $dlZip) } finally { $wc.Dispose() }
-                    $zip = $dlZip
-                    L "Zip $zipName telecharge depuis GitHub."
-                } catch { L "Telechargement GitHub KO ($($_.Exception.Message)) : repli sur le dossier local." }
+                foreach ($u in @("https://github.com/$Repo/releases/download/v$targetVer/$zipName", "$rawBase/$zipName")) {
+                    try {
+                        $wc = New-BootWebClient
+                        try { $wc.DownloadFile($u, $dlZip) } finally { $wc.Dispose() }
+                        $zip = $dlZip
+                        L "Zip $zipName telecharge : $u"
+                        break
+                    } catch { L "Telechargement KO ($u) : $($_.Exception.Message)" }
+                }
             }
             if (-not $zip) {
                 $localSrc = Join-Path $dist $zipName
                 if (Test-Path -LiteralPath $localSrc) { $zip = $localSrc } else { L "Zip introuvable : $localSrc" }
+            }
+            if ($zip) {
+                $refus = Test-BootPackage $zip
+                if ($refus) {
+                    L "Installation REFUSEE ($zipName) : $refus."
+                    if ($zip -ne (Join-Path $dist $zipName)) { Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue }
+                    $zip = $null
+                } else { L "Paquet $targetVer verifie (SHA-256 + signature)." }
             }
             if ($zip) {
                 L "Premiere installation : version $targetVer."

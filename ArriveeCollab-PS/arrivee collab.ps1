@@ -1906,7 +1906,7 @@ $form.Add_Shown({
     $timerUpd.Interval = 8000
     $timerUpd.Add_Tick({
         $this.Interval = [Math]::Max(10, [int]$global:Ctx.Config.UpdateCheckIntervalSec) * 1000
-        try { Invoke-UpdateCheck $global:Ctx } catch { Write-AppLog "[MAJ] Tick KO : $($_.Exception.Message)" }
+        try { Start-UpdateCheckAsync $global:Ctx } catch { Write-AppLog "[MAJ] Tick KO : $($_.Exception.Message)" }
     })
     $timerUpd.Start()
     # Tutoriel au tout premier lancement (différé ~1,4 s pour laisser l'UI se peindre).

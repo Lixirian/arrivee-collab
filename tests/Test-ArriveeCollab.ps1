@@ -126,6 +126,39 @@ try {
     Assert ($p.Version -eq '2.0.0' -and $p.Zip -eq 'Arrivee-Collab_version2.0.0.zip') 'update : parse -> zip par defaut'
     Assert ($null -eq (ConvertFrom-LatestJson '{ "zip": "x.zip" }')) 'update : parse sans version -> null'
     Assert ($null -eq (ConvertFrom-LatestJson 'pas du json'))        'update : parse json invalide -> null'
+    Assert ($null -eq (ConvertFrom-LatestJson '{ "version": "1.2; rm -rf" }')) 'update : version hors format -> null'
+    $pz = ConvertFrom-LatestJson ('{ "version": "1.2.0", "zip": "..\\..\\evil.zip", "sha256": "abcd", "sig": "S" }')
+    Assert ($pz.Zip -eq 'Arrivee-Collab_version1.2.0.zip') 'update : nom du zip reconstruit (pas celui du manifeste)'
+    Assert ($pz.Sha256 -eq 'ABCD' -and $pz.Sig -eq 'S') 'update : sha256 (majuscules) + sig lus'
+    Assert ($null -ne (ConvertFrom-LatestJson ([string][char]0xFEFF + '{ "version": "1.0.0" }'))) 'update : BOM tolere'
+
+    # Signature RSA / SHA-256 des versions
+    $rsaT = New-Object System.Security.Cryptography.RSACryptoServiceProvider(2048)
+    $pubT = $rsaT.ToXmlString($false)
+    $shaT = 'AB' * 32
+    $sigT = [Convert]::ToBase64String($rsaT.SignData([Text.Encoding]::UTF8.GetBytes((Get-ReleaseSignedText '1.2.0' $shaT)), 'SHA256'))
+    Assert ((Get-ReleaseSignedText '1.2.0' 'ab') -eq 'Arrivee-Collab|1.2.0|AB') 'sig : texte signe'
+    Assert (Test-ReleaseSignature $pubT '1.2.0' $shaT $sigT) 'sig : signature valide acceptee'
+    Assert (-not (Test-ReleaseSignature $pubT '1.2.1' $shaT $sigT)) 'sig : autre version refusee (pas de rejeu)'
+    Assert (-not (Test-ReleaseSignature $pubT '1.2.0' ('CD' * 32) $sigT)) 'sig : autre empreinte refusee'
+    $autre = (New-Object System.Security.Cryptography.RSACryptoServiceProvider(2048)).ToXmlString($false)
+    Assert (-not (Test-ReleaseSignature $autre '1.2.0' $shaT $sigT)) 'sig : autre cle refusee'
+    Assert (-not (Test-ReleaseSignature $pubT '1.2.0' $shaT '')) 'sig : signature vide refusee'
+    Assert (-not (Test-ReleaseSignature $pubT '1.2.0' $shaT 'pas-du-base64!')) 'sig : signature illisible refusee'
+    Assert (-not (Test-ReleaseSignature '' '1.2.0' $shaT $sigT)) 'sig : sans cle publique refusee'
+
+    # Contrôle d'un paquet : empreinte du fichier + signature
+    $zf = Join-Path $tmpRoot 'paquet.zip'
+    Set-Content -LiteralPath $zf -Value 'contenu du paquet'
+    $shaF = (Get-FileHash -LiteralPath $zf -Algorithm SHA256).Hash
+    $sigF = [Convert]::ToBase64String($rsaT.SignData([Text.Encoding]::UTF8.GetBytes((Get-ReleaseSignedText '1.2.0' $shaF)), 'SHA256'))
+    $mf = @{ Version = '1.2.0'; Sha256 = $shaF; Sig = $sigF }
+    Assert ($null -eq (Test-ReleasePackage $zf $mf $pubT)) 'paquet : conforme -> accepte'
+    Assert ($null -ne (Test-ReleasePackage $zf $mf ''))    'paquet : sans cle publique -> refuse'
+    Assert ($null -ne (Test-ReleasePackage $zf @{ Version = '1.2.0'; Sha256 = ''; Sig = $sigF } $pubT)) 'paquet : sans empreinte -> refuse'
+    Add-Content -LiteralPath $zf -Value 'altere'
+    Assert ((Test-ReleasePackage $zf $mf $pubT) -match 'SHA-256') 'paquet : fichier altere -> refuse'
+    Assert ($null -ne (Test-ReleasePackage (Join-Path $tmpRoot 'absent.zip') $mf $pubT)) 'paquet : absent -> refuse'
 
     # Get-UpdateRawBase : absent -> null ; configure -> URL raw
     Assert ($null -eq (Get-UpdateRawBase $ctx)) 'update : pas de repo github -> base null'

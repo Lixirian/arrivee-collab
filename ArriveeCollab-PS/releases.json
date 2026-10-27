@@ -1,4 +1,8 @@
 ﻿{
+    "1.11.0": [
+        "Mises à jour détectées plus vite : l'outil vérifie toutes les 2 minutes et la pastille « Mise à jour » apparaît dès la publication d'une nouvelle version (comme le widget Biblio-Tech). La vérification se fait en arrière-plan, sans jamais figer la fenêtre.",
+        "Sécurité renforcée : chaque mise à jour est désormais signée par l'éditeur. Avant toute installation, l'outil contrôle l'empreinte SHA-256 et la signature du paquet téléchargé, et refuse tout paquet qui ne serait pas authentique."
+    ],
     "1.10.0": [
         "Vérification automatique des homonymes : dès que le nom et le prénom sont saisis, l'outil recherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les comptes portant ce nom. Le résultat s'affiche à droite du bouton « Vérif. homonymes », qui permet aussi de relancer la recherche.",
         "En cas d'homonymes, une pastille rose « HOMONYMES DÉTECTÉS » apparaît : cliquez-la pour désigner le CP communiqué dans la RITM. Le formulaire passe alors en mail au demandeur (« Générer mail homonyme ») avec le CP communiqué et les CP trouvés ; la génération du mot de passe et les vérifications Mon-AD / OU sont désactivées. Les notes ServiceNow et Utilisateur s'adaptent.",

@@ -1,9 +1,11 @@
 ﻿{
-    "version":  "1.10.0",
-    "zip":  "Arrivee-Collab_version1.10.0.zip",
+    "version":  "1.11.0",
+    "zip":  "Arrivee-Collab_version1.11.0.zip",
+    "sha256":  "07B01176A552303B9929457EF7587E8DE40CF827A775854718C1DB3B598E1644",
+    "sig":  "jUu63rhsVvotjB+WCNx9cLkgJJMnwl/S/SQb5Tfp6PGGNGONYNT0CeRVKgMlOmExhkNOaHQuWdzu5UxY5KzgkBHrOFHtcfPziJVnih1HZjq597hELzi9/YHUXFZhP6BSsJrd0l54q9HNNn9KIQlrBQD7LU640XrIN8AqBXn8cHQqd/rQYmrIN3Hvhy5fbIHHYO8Y6woA04QBI8WB5BHY1yupONER9+/rNrk8x86+huf1eyo1qVWkLKcZZfD+Xh3U+emu4+ilXr3yMBdmZ/tQF4T5OdoX5NNXIw27Onnid2cV+6SZFgpuy/RcD6pyfRzx2wjd1kJRatRYMHPpvBzQi5qiOPhXQUuJ1phGQ6lpxeEwfNuLix7N2v1EW7uVEHQyIjKb4QR4ehE7vdNe0ZWwQE5yCOTg5CUEMu2un/yzLL4i/mVUtnvOYQEBn1vALdUlgEsSzXxf+moHYud3SrJaR+xFo1TSsZvhQLx+1lbECqu/ny3DfUl0mUTDQuBMbsZa",
+    "date":  "2026-10-27",
     "notes":  [
-                  "Vérification automatique des homonymes : dès que le nom et le prénom sont saisis, l\u0027outil recherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les comptes portant ce nom. Le résultat s\u0027affiche à droite du bouton « Vérif. homonymes », qui permet aussi de relancer la recherche.",
-                  "En cas d\u0027homonymes, une pastille rose « HOMONYMES DÉTECTÉS » apparaît : cliquez-la pour désigner le CP communiqué dans la RITM. Le formulaire passe alors en mail au demandeur (« Générer mail homonyme ») avec le CP communiqué et les CP trouvés ; la génération du mot de passe et les vérifications Mon-AD / OU sont désactivées. Les notes ServiceNow et Utilisateur s\u0027adaptent.",
-                  "Si ServiceNow réclame une connexion que le SSO ne peut pas faire seul, une fenêtre de connexion s\u0027ouvre une seule fois, puis la session est mémorisée."
+                  "Mises à jour détectées plus vite : l\u0027outil vérifie toutes les 2 minutes et la pastille « Mise à jour » apparaît dès la publication d\u0027une nouvelle version (comme le widget Biblio-Tech). La vérification se fait en arrière-plan, sans jamais figer la fenêtre.",
+                  "Sécurité renforcée : chaque mise à jour est désormais signée par l\u0027éditeur. Avant toute installation, l\u0027outil contrôle l\u0027empreinte SHA-256 et la signature du paquet téléchargé, et refuse tout paquet qui ne serait pas authentique."
               ]
 }

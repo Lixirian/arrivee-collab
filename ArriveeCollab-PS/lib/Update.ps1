@@ -61,27 +61,90 @@ function Invoke-UpdateDownload {
     } finally { $wc.Dispose() }
 }
 
-# Parse le CONTENU d'un latest.json -> @{ Version; Zip; Notes(@()) } ou $null.
-# Fonction pure (testable hors ligne), partagée par les deux canaux.
+# Parse le CONTENU d'un latest.json -> @{ Version; Zip; Sha256; Sig; Notes(@()) } ou $null.
+# Fonction pure (testable hors ligne), partagée par tous les canaux.
+# Le manifeste n'est pas signé lui-même : on n'accepte qu'une version au format strict et
+# le nom du zip est RECONSTRUIT (jamais repris du manifeste : un manifeste forgé ne peut
+# pas viser un autre fichier, ex. « ..\..\x.zip »). L'authenticité du zip est garantie
+# par Sha256 + Sig, vérifiés avant installation (Test-ReleasePackage).
 function ConvertFrom-LatestJson {
     param([string]$Raw)
     if (-not $Raw) { return $null }
     try {
-        $j = $Raw | ConvertFrom-Json
-        if (-not $j.version) { return $null }
-        $zip = [string]$j.zip
-        if (-not $zip) { $zip = "Arrivee-Collab_version$([string]$j.version).zip" }
+        $j = $Raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+        $ver = [string]$j.version
+        if ($ver -notmatch '^\d{1,4}(\.\d{1,4}){1,3}$') { return $null }
         $notes = @()
         if ($j.notes) { $notes = @($j.notes | ForEach-Object { [string]$_ }) }
-        return @{ Version = [string]$j.version; Zip = $zip; Notes = $notes }
+        return @{
+            Version = $ver; Zip = "Arrivee-Collab_version$ver.zip"; Notes = $notes
+            Sha256 = ([string]$j.sha256).ToUpperInvariant(); Sig = [string]$j.sig
+        }
     } catch { return $null }
 }
 
-# Lit latest.json -> @{ Version; Zip; Notes; Source ('github'|'dossier') } ou $null.
-# Essaie GITHUB d'abord (cache-bust : le CDN raw peut servir ~5 min de cache), puis
-# se replie sur le dossier de distribution.
+# Texte signé par l'éditeur pour une version : lie la version ET le contenu exact du zip
+# (on ne peut ni rejouer l'ancienne signature d'une autre version, ni changer le zip).
+function Get-ReleaseSignedText {
+    param([string]$Version, [string]$Sha256)
+    return "Arrivee-Collab|$Version|$($Sha256.ToUpperInvariant())"
+}
+
+# Signature RSA 3072 / SHA-256 (base64) vérifiée avec la clé PUBLIQUE embarquée
+# (Config.ReleasePublicKey, XML). La clé privée ne quitte jamais le poste de l'éditeur
+# (build-zip.ps1, chiffrée DPAPI). Fonction pure : $false au moindre doute.
+function Test-ReleaseSignature {
+    param([string]$PublicKeyXml, [string]$Version, [string]$Sha256, [string]$Sig)
+    if (-not $PublicKeyXml -or -not $Version -or -not $Sha256 -or -not $Sig) { return $false }
+    try {
+        $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider((New-Object System.Security.Cryptography.CspParameters 24))
+        try {
+            $rsa.FromXmlString($PublicKeyXml)
+            return $rsa.VerifyData([Text.Encoding]::UTF8.GetBytes((Get-ReleaseSignedText $Version $Sha256)), 'SHA256', [Convert]::FromBase64String($Sig))
+        } finally { $rsa.Dispose() }
+    } catch { return $false }
+}
+
+# Contrôle d'un zip téléchargé AVANT installation : empreinte SHA-256 identique à celle
+# du manifeste ET signature de l'éditeur valide. Renvoie $null si OK, sinon le motif.
+function Test-ReleasePackage {
+    param([string]$ZipPath, $Manifest, [string]$PublicKeyXml)
+    if (-not (Test-Path -LiteralPath $ZipPath)) { return 'zip introuvable' }
+    if (-not $PublicKeyXml) { return 'clé publique de vérification absente de la configuration' }
+    $sha = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    if (-not $Manifest.Sha256 -or $sha -ne $Manifest.Sha256) { return "empreinte SHA-256 invalide (attendu '$($Manifest.Sha256)', obtenu $sha)" }
+    if (-not (Test-ReleaseSignature $PublicKeyXml $Manifest.Version $sha $Manifest.Sig)) { return 'signature de l''éditeur absente ou invalide' }
+    return $null
+}
+
+# URL du latest.json joint à la DERNIÈRE release GitHub (créée par build-zip.ps1) :
+# disponible DÈS la publication, contrairement au fichier du dépôt servi par le CDN
+# raw (~5 min de cache, le paramètre anti-cache n'y change rien). Même canal que
+# le widget Biblio-Tech. $null si aucun dépôt configuré.
+function Get-UpdateReleaseManifestUrl {
+    param($Ctx)
+    $repo = [string]$Ctx.Config.UpdateRepo
+    if (-not $repo) { return $null }
+    return ('https://github.com/{0}/releases/latest/download/latest.json?t={1}' -f $repo, [DateTime]::UtcNow.Ticks)
+}
+
+# Lit latest.json -> @{ Version; Zip; Notes; Source ('release'|'github'|'dossier') } ou $null.
+# Ordre : release GitHub (immédiat) -> fichier du dépôt (raw, ~5 min de cache) ->
+# dossier de distribution.
 function Get-LatestManifest {
     param($Ctx)
+    $relUrl = Get-UpdateReleaseManifestUrl $Ctx
+    if ($relUrl) {
+        try {
+            $m = ConvertFrom-LatestJson ([string](Invoke-UpdateDownload -Uri $relUrl))
+            if ($m) { $m.Source = 'release'; return $m }
+        } catch {
+            if (-not $script:UpdateReleaseFailLogged) {
+                $script:UpdateReleaseFailLogged = $true
+                Write-AppLog "[MAJ] latest.json de la release illisible ($($_.Exception.Message)) : repli sur le dépôt."
+            }
+        }
+    }
     $base = Get-UpdateRawBase $Ctx
     if ($base) {
         try {
@@ -181,11 +244,17 @@ function Get-ReleaseNotesBetween {
 # dossier : ne proposer que si le zip annoncé est bien là. Ne lève jamais.
 function Invoke-UpdateCheck {
     param($Ctx)
+    try { $m = Get-LatestManifest $Ctx } catch { $m = $null; Write-AppLog "[MAJ] Vérification KO : $($_.Exception.Message)" }
+    Complete-UpdateCheck $Ctx $m
+}
+
+# Applique le résultat d'un contrôle (manifeste ou $null) : UpdateAvailable + pastille.
+function Complete-UpdateCheck {
+    param($Ctx, $m)
     try {
-        $m = Get-LatestManifest $Ctx
         if ($m -and (Compare-AppVersion $m.Version $Ctx.Config.Version) -gt 0) {
             $zipOk = $true
-            if ($m.Source -ne 'github') {
+            if ($m.Source -notin @('release', 'github')) {
                 $dir = Get-UpdateDir $Ctx
                 $zipPath = if ($dir) { Join-Path $dir $m.Zip } else { $null }
                 $zipOk = [bool]($zipPath -and (Test-Path -LiteralPath $zipPath))
@@ -204,6 +273,49 @@ function Invoke-UpdateCheck {
         }
     } catch { Write-AppLog "[MAJ] Vérification KO : $($_.Exception.Message)" }
     try { Update-UpdateBadge $Ctx } catch { }
+}
+
+# Contrôle périodique NON BLOQUANT : les requêtes réseau (jusqu'à 3 sources, proxy
+# lent…) tournent dans un runspace, l'interface ne gèle jamais. Le résultat est relevé
+# par un timer WinForms (thread UI) puis appliqué par Complete-UpdateCheck.
+function Start-UpdateCheckAsync {
+    param($Ctx)
+    if ($global:UpdateCheckJob) { return }   # contrôle déjà en cours
+    $lib = Join-Path $Ctx.AppRoot 'lib'
+    $ps = [PowerShell]::Create()
+    [void]$ps.AddScript({
+        param($LibDir, $Config, $DataDir, $AppRoot)
+        . (Join-Path $LibDir 'Common.ps1')
+        . (Join-Path $LibDir 'Update.ps1')
+        $c = @{ Config = $Config; DataDir = $DataDir; AppRoot = $AppRoot }
+        try { return @{ Ok = $true; Manifest = (Get-LatestManifest $c) } }
+        catch { return @{ Ok = $false; Error = $_.Exception.Message } }
+    }.ToString()).AddArgument($lib).AddArgument($Ctx.Config).AddArgument($Ctx.DataDir).AddArgument($Ctx.AppRoot)
+    $global:UpdateCheckJob = @{ PS = $ps; Handle = $ps.BeginInvoke(); Started = Get-Date }
+    $t = New-Object Windows.Forms.Timer
+    $t.Interval = 500
+    $t.Add_Tick({
+        $j = $global:UpdateCheckJob
+        if (-not $j) { $this.Stop(); $this.Dispose(); return }
+        if (-not $j.Handle.IsCompleted) {
+            if (((Get-Date) - $j.Started).TotalSeconds -lt 120) { return }
+            try { $j.PS.Stop() } catch { }
+            Write-AppLog '[MAJ] Vérification abandonnée (délai dépassé).'
+            $r = $null
+        } else {
+            $r = $null
+            try { foreach ($o in $j.PS.EndInvoke($j.Handle)) { if ($o -is [hashtable]) { $r = $o } } } catch { Write-AppLog "[MAJ] Vérification KO : $($_.Exception.Message)" }
+        }
+        try { $j.PS.Dispose() } catch { }
+        $global:UpdateCheckJob = $null
+        $this.Stop(); $this.Dispose()
+        if ($r -and -not $r.Ok) { Write-AppLog "[MAJ] Vérification KO : $($r.Error)" }
+        $m = if ($r -and $r.Ok) { $r.Manifest } else { $null }
+        # Échec réseau : on garde l'état connu (pas de pastille qui clignote).
+        if ($null -eq $m -and -not ($r -and $r.Ok)) { return }
+        Complete-UpdateCheck $global:Ctx $m
+    })
+    $t.Start()
 }
 
 # ============================================================================
@@ -340,14 +452,24 @@ function Invoke-SelfUpdate {
         if (-not (Test-Path -LiteralPath $upDir)) { New-Item -ItemType Directory -Path $upDir -Force | Out-Null }
         $localZip = Join-Path $upDir ("new_$($m.Version).zip")
 
-        if ($m.Source -eq 'github') {
-            # Canal GitHub : téléchargement du zip versionné depuis le dépôt.
+        if ($m.Source -in @('release', 'github')) {
+            # Canal GitHub : zip joint à la release v<X> (en ligne dès la publication),
+            # repli sur le zip versionné du dépôt (raw).
             $base = Get-UpdateRawBase $Ctx
             if (-not $base) { Write-AppLog "[MAJ] Dépôt GitHub non configuré."; return }
-            try {
-                [void](Invoke-UpdateDownload -Uri ("$base/$($m.Zip)") -OutFile $localZip)
-                Write-AppLog ("[MAJ] Zip {0} téléchargé depuis GitHub." -f $m.Zip)
-            } catch { Write-AppLog "[MAJ] Téléchargement GitHub KO : $($_.Exception.Message)"; return }
+            $urls = @(
+                ('https://github.com/{0}/releases/download/v{1}/{2}' -f $Ctx.Config.UpdateRepo, $m.Version, $m.Zip),
+                "$base/$($m.Zip)"
+            )
+            $ok = $false
+            foreach ($u in $urls) {
+                try {
+                    [void](Invoke-UpdateDownload -Uri $u -OutFile $localZip)
+                    Write-AppLog ("[MAJ] Zip {0} téléchargé : {1}" -f $m.Zip, $u)
+                    $ok = $true; break
+                } catch { Write-AppLog "[MAJ] Téléchargement KO ($u) : $($_.Exception.Message)" }
+            }
+            if (-not $ok) { return }
         } else {
             # Repli : copie depuis le dossier de distribution.
             $dir = Get-UpdateDir $Ctx
@@ -356,6 +478,17 @@ function Invoke-SelfUpdate {
             if (-not (Test-Path -LiteralPath $srcZip)) { Write-AppLog "[MAJ] Zip source introuvable : $srcZip"; return }
             Copy-Item -LiteralPath $srcZip -Destination $localZip -Force
         }
+
+        # Intégrité + authenticité (normes cyber / DSI) : rien n'est installé si le zip
+        # n'est pas exactement celui signé par l'éditeur.
+        $refus = Test-ReleasePackage $localZip $m ([string]$Ctx.Config.ReleasePublicKey)
+        if ($refus) {
+            Write-AppLog "[MAJ] Mise à jour $($m.Version) REFUSÉE : $refus."
+            Remove-Item -LiteralPath $localZip -Force -ErrorAction SilentlyContinue
+            try { Show-AlertDialog -message "La mise à jour $($m.Version) a été refusée car le paquet téléchargé n'a pas pu être authentifié ($refus).`n`nAucune modification n'a été faite. Réessayez plus tard ou prévenez le responsable de l'outil." -title "Mise à jour refusée" } catch { }
+            return
+        }
+        Write-AppLog "[MAJ] Paquet $($m.Version) vérifié (SHA-256 + signature)."
 
         $appRoot   = $Ctx.AppRoot
         $launcher  = Join-Path $appRoot 'Start-ArriveeCollab.vbs'
