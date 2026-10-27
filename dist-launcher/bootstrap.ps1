@@ -16,6 +16,8 @@ $Repo    = 'Lixirian/arrivee-collab'   # dépôt GitHub public de distribution
 $Branch  = 'main'
 # Clé PUBLIQUE de l'éditeur (inscrite par build-zip.ps1 -NewSigningKey, identique à
 # config.ps1) : aucun zip n'est installé sans empreinte SHA-256 + signature valides.
+# Version minimale installable (première version avec l'ensemble des protections).
+$MinVersion = '1.13.0'
 $ReleasePublicKey = '<RSAKeyValue><Modulus>raIRN/8SJiSaul7c49MAezHpVdn+NqrVeiWVGITIrSYg8vnPJV6OUndLedwPAq8+JnsVJdzeublKQJ4gpsW7slTiBYMgHoP36anKfQVi5HvH3NxFIG0nEYUuXTwBI69ffiM6PnmgRWM4D0JaoKDy45PugMg48YQ7av2yfjzZrBAKHEUL3kYEomblDASWhHYqHFM/o1wt7y0qzHZ60cTgNJXTwLD0u50Hv/VRjorFbkm/AmgOfkG/wDFisdt2AiQDVD9y5XeGoKemdG4LVTs/CRDxyHVwGoWSMoIeR9AHYD4FQAuK4IG9as/LmbTqsOeBDxK1kXYaPoBmwhX7vt+j91U4EHXDf90s8yzfurWrP8Uaw3BDUJeFIiyTmcIj/9fQr5T7fMgsfm8p9Hz1mBXJXouHOxBJrYF5pFoLeOF8Sye9Sj6yAnWsIRYF0XkD0R4JwT+1txdtpO3SLdZwLy/pj40r5zUxAbf1yNfkYUSANfJHRgXxHUc5YwBTkxazJQCh</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>'
 $dist    = $PSScriptRoot
 $dataDir = Join-Path $env:LOCALAPPDATA 'Arrivee-Collab'
@@ -60,10 +62,14 @@ try {
             try { $j = (Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json); $srcMode = 'dossier' } catch { L "latest.json illisible : $($_.Exception.Message)" }
         }
     }
-    # Version au format strict ; nom du zip RECONSTRUIT (jamais repris du manifeste).
+    # Version au format strict et au moins égale au minimum accepté (pas de première
+    # installation d'une ancienne version signée) ; nom du zip RECONSTRUIT (jamais repris
+    # du manifeste).
     if ($j -and ([string]$j.version) -match '^\d{1,4}(\.\d{1,4}){1,3}$') {
-        $targetVer = [string]$j.version
-        $zipName = "Arrivee-Collab_version$targetVer.zip"
+        if ([version]([string]$j.version) -ge [version]$MinVersion) {
+            $targetVer = [string]$j.version
+            $zipName = "Arrivee-Collab_version$targetVer.zip"
+        } else { L "latest.json : version $($j.version) inférieure au minimum accepté ($MinVersion) : ignorée." }
     } elseif ($j) { L "latest.json : version invalide « $($j.version) »." }
 
     # Empreinte SHA-256 + signature RSA de l'éditeur sur « Arrivee-Collab|<version>|<SHA> ».
@@ -152,7 +158,7 @@ try {
     # Lance l'application locale (masquée via son .vbs).
     $vbs = Join-Path $appDir 'Start-ArriveeCollab.vbs'
     if (Test-Path $vbs) {
-        Start-Process -FilePath 'wscript.exe' -ArgumentList ('"' + $vbs + '"') -WorkingDirectory $appDir
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\wscript.exe') -ArgumentList ('"' + $vbs + '"') -WorkingDirectory $appDir
         L "Application lancee depuis $appDir."
     } else {
         L "Start-ArriveeCollab.vbs introuvable dans $appDir (aucune version installee ?)."

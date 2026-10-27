@@ -45,6 +45,58 @@ Assert ((Get-DateInitDepuisJoursRestants 0 -Reference $ref) -eq [datetime]'2025-
 Assert ((Get-DateInitDepuisJoursRestants 80 -DureeValidite 90 -Reference $ref) -eq [datetime]'2026-07-18') 'restants : duree de validite parametrable'
 Assert ($null -eq (ConvertTo-NombreDeJours '366' -Max $script:DureeValiditeMdp)) 'restants : au-dela de la validite -> null'
 
+# --- Sécurité : mot de passe, saisies, purge (lib/Common.ps1) ---
+$amb = '[0Oo1lI"&'' ]'
+$okClasses = $true; $okAmb = $true; $okLong = $true
+foreach ($i in 1..300) {
+    $pw = New-MotDePasse
+    if ($pw.Length -ne 12) { $okLong = $false }
+    if ($pw -cnotmatch '[A-Z]' -or $pw -cnotmatch '[a-z]' -or $pw -notmatch '\d' -or $pw -notmatch '[!#$%*+\-=?@]') { $okClasses = $false }
+    if ($pw -cmatch $amb) { $okAmb = $false }
+}
+Assert $okLong    'mdp : 12 caracteres'
+Assert $okClasses 'mdp : majuscule + minuscule + chiffre + special a chaque tirage (300 essais)'
+Assert $okAmb     'mdp : aucun caractere ambigu ni guillemet / & / espace'
+Assert ((New-MotDePasse 16).Length -eq 16) 'mdp : longueur parametrable'
+Assert ((@(1..50 | ForEach-Object { New-MotDePasse }) | Sort-Object -Unique).Count -eq 50) 'mdp : tirages distincts'
+Assert ((ConvertTo-NomFichierSur 'Jean DUPONT') -eq 'JeanDUPONT') 'fichier : nom assaini'
+Assert ((ConvertTo-NomFichierSur '..\..\Startup\x:y[1]') -eq 'Startupxy1') 'fichier : separateurs, .., : et jokers retires'
+Assert ((ConvertTo-NomFichierSur '<>"|').Length -eq 12) 'fichier : repli aleatoire si vide'
+Assert (Test-NumeroRitmValide 'RITM2178872') 'ritm : valide'
+Assert (-not (Test-NumeroRitmValide "RITM1';Start-Process calc;'")) 'ritm : injection refusee'
+Assert (-not (Test-NumeroRitmValide 'RITM12')) 'ritm : trop court refuse'
+Assert (Test-NomPrenomValide "KHADRAOUI Mohamed-Nedal") 'nom : compose accepte'
+Assert (Test-NomPrenomValide "Jérôme D'Arc") 'nom : accents et apostrophe acceptes'
+Assert (-not (Test-NomPrenomValide 'Jean<img src=x onerror=alert(1)>')) 'nom : balisage refuse'
+Assert (-not (Test-NomPrenomValide 'Jean & Co')) 'nom : & refuse'
+Assert (Test-AdresseMailValide 'jean-philippe.mineo@sncf.fr') 'mail : adresse valide'
+Assert (-not (Test-AdresseMailValide 'a@sncf.fr; b@evil.com')) 'mail : liste refusee'
+Assert (-not (Test-AdresseMailValide 'Jean <a@sncf.fr>')) 'mail : nom affiche refuse'
+$tmpPurge = Join-Path $env:TEMP ("ac_purge_" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmpPurge | Out-Null
+try {
+    $vieux = Join-Path $tmpPurge 'vieux.msg'; $recent = Join-Path $tmpPurge 'recent.msg'; $autre = Join-Path $tmpPurge 'vieux.txt'
+    foreach ($f in $vieux, $recent, $autre) { Set-Content -LiteralPath $f -Value 'x' }
+    (Get-Item -LiteralPath $vieux).LastWriteTime = (Get-Date).AddDays(-31)
+    (Get-Item -LiteralPath $autre).LastWriteTime = (Get-Date).AddDays(-31)
+    $n = Remove-FichiersAnciens $tmpPurge 30 '*.msg'
+    Assert ($n -eq 1 -and -not (Test-Path -LiteralPath $vieux) -and (Test-Path -LiteralPath $recent) -and (Test-Path -LiteralPath $autre)) 'purge : seuls les .msg de plus de 30 jours'
+    Assert ((Remove-FichiersAnciens $tmpPurge 0) -eq 2 -and @(Get-ChildItem -LiteralPath $tmpPurge).Count -eq 0) 'purge : 0 jour = tout supprimer'
+    Assert ((Remove-FichiersAnciens (Join-Path $tmpPurge 'absent') 0) -eq 0) 'purge : dossier absent sans erreur'
+} finally { Remove-Item -LiteralPath $tmpPurge -Recurse -Force -ErrorAction SilentlyContinue }
+
+# --- Page ServiceNow cachée : hôtes autorisés (lib/SnowPage.ps1) ---
+. (Join-Path $lib 'SnowPage.ps1')
+Assert (Test-SnowHoteAutorise 'https://sncf.service-now.com/now/nav/ui/classic/params/target/sys_user_list.do') 'snow : instance autorisee'
+Assert (Test-SnowHoteAutorise 'https://idp.sncf.fr/openam/XUI/') 'snow : IdP SNCF autorise'
+Assert (-not (Test-SnowHoteAutorise 'https://evil.service-now.com/')) 'snow : autre instance ServiceNow refusee'
+Assert (-not (Test-SnowHoteAutorise 'https://evilservice-now.com/')) 'snow : faux domaine refuse'
+Assert (-not (Test-SnowHoteAutorise 'https://sncf.fr.evil.com/')) 'snow : suffixe trompeur refuse'
+Assert (-not (Test-SnowHoteAutorise 'http://sncf.service-now.com/')) 'snow : http refuse'
+Assert (-not (Test-SnowHoteAutorise 'file://C:/Windows/win.ini')) 'snow : file refuse'
+$js = Get-SnowKickJs "/x.do?a=1&b='2'</script>"
+Assert ($js -match [regex]::Escape('fetch("/x.do?a=1\u0026b=\u00272\u0027\u003c/script\u003e"') -or $js -match 'fetch\("/x\.do\?a=1') 'snow : URL inseree comme litteral JS echappe'
+
 # --- Homonymes (helpers purs de lib/Homonymes.ps1) ---
 . (Join-Path $lib 'Homonymes.ps1')
 Assert ((ConvertTo-NomNormalise '  Jérémy   Pasturel ') -eq 'JEREMY PASTUREL') 'homo : normalisation accents/casse/espaces'
@@ -187,6 +239,28 @@ try {
     Add-Content -LiteralPath $zf -Value 'altere'
     Assert ((Test-ReleasePackage $zf $mf $pubT) -match 'SHA-256') 'paquet : fichier altere -> refuse'
     Assert ($null -ne (Test-ReleasePackage (Join-Path $tmpRoot 'absent.zip') $mf $pubT)) 'paquet : absent -> refuse'
+
+    # Signature du manifeste entier (msig : version, empreinte, date, notes)
+    $notesT = @('Note A', 'Note B')
+    $msigT = [Convert]::ToBase64String($rsaT.SignData([Text.Encoding]::UTF8.GetBytes((Get-ManifestSignedText '1.2.0' $shaT '2026-10-27' $notesT)), 'SHA256'))
+    $manT = @{ Version = '1.2.0'; Sha256 = $shaT; Date = '2026-10-27'; Notes = $notesT; MSig = $msigT }
+    Assert (Test-ManifestSignature $manT $pubT) 'manifeste : signature valide acceptee'
+    Assert (-not (Test-ManifestSignature (@{} + $manT + @{}) '')) 'manifeste : sans cle refuse'
+    $forge = $manT.Clone(); $forge.Notes = @('Appelez le 06 00 00 00 00 pour activer la mise a jour')
+    Assert (-not (Test-ManifestSignature $forge $pubT)) 'manifeste : notes modifiees refusees'
+    $forge = $manT.Clone(); $forge.Version = '999.0'
+    Assert (-not (Test-ManifestSignature $forge $pubT)) 'manifeste : version 999 forgee refusee'
+    $forge = $manT.Clone(); $forge.MSig = ''
+    Assert (-not (Test-ManifestSignature $forge $pubT)) 'manifeste : sans msig refuse'
+    # Complete-UpdateCheck : un manifeste non authentifie ne pose aucune pastille
+    function Update-UpdateBadge { param($c) }
+    $ctxSig = @{ Config = @{ Version = '1.0.0'; ReleasePublicKey = $pubT }; UpdateAvailable = $null }
+    $forge = $manT.Clone(); $forge.Version = '999.0'; $forge.Source = 'release'
+    Complete-UpdateCheck $ctxSig $forge
+    Assert ($null -eq $ctxSig.UpdateAvailable) 'manifeste : version forgee -> aucune mise a jour proposee'
+    $ok = $manT.Clone(); $ok.Source = 'release'
+    Complete-UpdateCheck $ctxSig $ok
+    Assert ($ctxSig.UpdateAvailable.Version -eq '1.2.0') 'manifeste : authentique -> mise a jour proposee'
 
     # Get-UpdateRawBase : absent -> null ; configure -> URL raw
     Assert ($null -eq (Get-UpdateRawBase $ctx)) 'update : pas de repo github -> base null'

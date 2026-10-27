@@ -1,4 +1,10 @@
 ﻿{
+    "1.13.0": [
+        "Vérifications ServiceNow plus fiables : la recherche attend que la page soit complètement prête, et en cas d'absence de réponse ou de session expirée l'outil relance automatiquement la synchronisation SSO puis réessaie.",
+        "Sécurité renforcée suite à une revue complète : mot de passe toujours composé d'une majuscule, d'une minuscule, d'un chiffre et d'un caractère spécial (sans caractères ambigus) ; copié hors de l'historique du presse-papiers (Win+V) et effacé au bout de 2 minutes ; fichiers temporaires du mot de passe supprimés automatiquement ; mails archivés conservés 30 jours.",
+        "Contrôle des saisies avant génération du mail (numéro de RITM, nom et prénom, adresse du demandeur) et protection de l'aperçu contre tout contenu piégé.",
+        "La case « Réduction auto en bulle » est désormais bien visible (case violette)."
+    ],
     "1.12.0": [
         "Vérification automatique des doublons de demande : dès que la RITM et le nom sont saisis, l'outil cherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les tâches d'arrivée du même bénéficiaire, en cours ou réalisées, rattachées à une autre RITM. Le résultat s'affiche à droite du nouveau bouton « Vérif. doublons ».",
         "En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d'annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour en choisir une autre ou écarter l'alerte. Les notes ServiceNow et Utilisateur s'adaptent, et l'outil vous rappelle de passer la balise de la RITM à « Annulation - Doublon ». Un doublon l'emporte sur les homonymes.",

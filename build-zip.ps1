@@ -70,7 +70,12 @@ if ($NewSigningKey) {
 # Format de sauvegarde : 'ACKEY1' | sel (16) | IV (16) | AES-256-CBC(clé XML) | HMAC-SHA256 (32).
 if ($ExportSigningKey) {
     if (-not (Test-Path -LiteralPath $keyFile)) { throw "Aucune clé à sauvegarder ($keyFile)." }
-    if (-not $KeyBackup) { $KeyBackup = Join-Path ([Environment]::GetFolderPath('Desktop')) 'arrivee-collab-signing-key.backup' }
+    if (-not $KeyBackup) { throw 'Indiquez où écrire la sauvegarde : -KeyBackup <fichier> (support hors ligne ou dossier non synchronisé, jamais le dépôt).' }
+    $kbFull = [IO.Path]::GetFullPath($KeyBackup)
+    if ($kbFull.StartsWith([IO.Path]::GetFullPath($repo), [StringComparison]::OrdinalIgnoreCase)) { throw 'La sauvegarde ne doit pas être écrite dans le dépôt (public).' }
+    foreach ($od in @($env:OneDrive, $env:OneDriveCommercial, $env:OneDriveConsumer) | Where-Object { $_ }) {
+        if ($kbFull.StartsWith([IO.Path]::GetFullPath($od), [StringComparison]::OrdinalIgnoreCase)) { throw "La sauvegarde ne doit pas être écrite dans un dossier OneDrive synchronisé ($od)." }
+    }
     if (Test-Path -LiteralPath $KeyBackup) { throw "$KeyBackup existe déjà." }
     $plainKey = [Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($keyFile), $null, 'CurrentUser')
     $salt = New-Object byte[] 16; $iv = New-Object byte[] 16
@@ -125,7 +130,27 @@ $pubBranch = if ($mb.Success -and $mb.Groups[1].Value) { $mb.Groups[1].Value } e
 # Staging : copie temporaire renommée pour que le dossier racine du zip = $name.
 $staging = Join-Path ([System.IO.Path]::GetTempPath()) $name
 if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
-Copy-Item -LiteralPath $src -Destination $staging -Recurse
+# Contenu = fichiers de ArriveeCollab-PS suivis par Git + nouveaux fichiers NON ignorés
+# (.gitignore respecté : un .msg de test ou un dossier « Mot de passe » oublié n'est
+# jamais publié). Les nouveaux fichiers sont ajoutés à Git pour être commités avec le build.
+Push-Location $repo
+try {
+    $fichiers = @(& git -c core.quotepath=off ls-files --cached --others --exclude-standard -- 'ArriveeCollab-PS' 2>$null)
+    $nouveaux = @(& git -c core.quotepath=off ls-files --others --exclude-standard -- 'ArriveeCollab-PS' 2>$null)
+} finally { Pop-Location }
+if ($fichiers.Count -eq 0) { throw "Aucun fichier à empaqueter (git ls-files a échoué ?)." }
+if ($nouveaux.Count -gt 0) {
+    Write-Host ("Nouveaux fichiers inclus et ajoutés à Git : " + ($nouveaux -join ', ')) -ForegroundColor Yellow
+    Push-Location $repo; try { & git add -- $nouveaux 2>$null | Out-Null } finally { Pop-Location }
+}
+New-Item -ItemType Directory -Path $staging -Force | Out-Null
+foreach ($rel in $fichiers) {
+    $relApp = $rel.Substring('ArriveeCollab-PS/'.Length)
+    $dst = Join-Path $staging $relApp
+    $dstDir = Split-Path $dst -Parent
+    if (-not (Test-Path -LiteralPath $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
+    Copy-Item -LiteralPath (Join-Path $repo $rel) -Destination $dst -Force
+}
 
 $zip = Join-Path $repo "$name.zip"
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
@@ -144,7 +169,13 @@ if (Test-Path -LiteralPath $relFile) {
 # Empreinte + signature : ce que l'app et le lanceur vérifient avant toute installation.
 $sha = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToUpperInvariant()
 $sig = [Convert]::ToBase64String($signer.SignData([Text.Encoding]::UTF8.GetBytes("Arrivee-Collab|$ver|$sha"), 'SHA256'))
-$manifest = [ordered]@{ version = $ver; zip = "$name.zip"; sha256 = $sha; sig = $sig; date = (Get-Date -Format 'yyyy-MM-dd'); notes = $notes }
+# Signature du manifeste ENTIER (msig : version, empreinte, date, notes) : texte
+# calculé par la MÊME fonction que celle de l'app qui le vérifie (lib/Update.ps1).
+. (Join-Path $src 'lib\Update.ps1')
+$date = Get-Date -Format 'yyyy-MM-dd'
+$notesTxt = @($notes | ForEach-Object { [string]$_ })
+$msig = [Convert]::ToBase64String($signer.SignData([Text.Encoding]::UTF8.GetBytes((Get-ManifestSignedText $ver $sha $date $notesTxt)), 'SHA256'))
+$manifest = [ordered]@{ version = $ver; zip = "$name.zip"; sha256 = $sha; sig = $sig; msig = $msig; date = $date; notes = $notesTxt }
 ($manifest | ConvertTo-Json -Depth 5) | Out-File -LiteralPath (Join-Path $repo 'latest.json') -Encoding UTF8 -Force
 
 # Archive les anciennes versions : tout Arrivee-Collab_version*.zip SAUF la courante.

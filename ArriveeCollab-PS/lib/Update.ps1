@@ -79,8 +79,35 @@ function ConvertFrom-LatestJson {
         return @{
             Version = $ver; Zip = "Arrivee-Collab_version$ver.zip"; Notes = $notes
             Sha256 = ([string]$j.sha256).ToUpperInvariant(); Sig = [string]$j.sig
+            Date = [string]$j.date; MSig = [string]$j.msig
         }
     } catch { return $null }
+}
+
+# Texte signé pour le MANIFESTE entier (champ msig) : version, empreinte, date et
+# empreinte SHA-256 des notes (une par ligne). Un manifeste forgé ne peut donc ni
+# afficher de fausses notes ni annoncer une version qui n'existe pas.
+function Get-ManifestSignedText {
+    param([string]$Version, [string]$Sha256, [string]$Date, $Notes)
+    $h = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $nh = -join ($h.ComputeHash([Text.Encoding]::UTF8.GetBytes(((@($Notes) | ForEach-Object { [string]$_ }) -join "`n"))) | ForEach-Object { $_.ToString('X2') })
+    } finally { $h.Dispose() }
+    return "Arrivee-Collab-manifest|$Version|$($Sha256.ToUpperInvariant())|$Date|$nh"
+}
+
+# Manifeste authentique ? (signature msig vérifiée avec la clé publique embarquée).
+function Test-ManifestSignature {
+    param($Manifest, [string]$PublicKeyXml)
+    if (-not $Manifest -or -not $PublicKeyXml -or -not $Manifest.MSig -or -not $Manifest.Sha256) { return $false }
+    try {
+        $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider((New-Object System.Security.Cryptography.CspParameters 24))
+        try {
+            $rsa.FromXmlString($PublicKeyXml)
+            $txt = Get-ManifestSignedText $Manifest.Version $Manifest.Sha256 $Manifest.Date $Manifest.Notes
+            return $rsa.VerifyData([Text.Encoding]::UTF8.GetBytes($txt), 'SHA256', [Convert]::FromBase64String($Manifest.MSig))
+        } finally { $rsa.Dispose() }
+    } catch { return $false }
 }
 
 # Texte signé par l'éditeur pour une version : lie la version ET le contenu exact du zip
@@ -252,6 +279,17 @@ function Invoke-UpdateCheck {
 function Complete-UpdateCheck {
     param($Ctx, $m)
     try {
+        # Manifeste non authentifié (clé publique présente) : ignoré, aucune pastille,
+        # aucune note affichée. Évite les fausses annonces / notes et le blocage par
+        # une version « 999 » inexistante.
+        $pub = [string]$Ctx.Config.ReleasePublicKey
+        if ($m -and $pub -and -not (Test-ManifestSignature $m $pub)) {
+            if ($script:ManifesteRefuseVersion -ne $m.Version) {
+                $script:ManifesteRefuseVersion = $m.Version
+                Write-AppLog "[MAJ] Manifeste $($m.Version) (source $($m.Source)) NON AUTHENTIFIÉ : ignoré."
+            }
+            $m = $null
+        }
         if ($m -and (Compare-AppVersion $m.Version $Ctx.Config.Version) -gt 0) {
             $zipOk = $true
             if ($m.Source -notin @('release', 'github')) {
@@ -512,7 +550,7 @@ try {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
     }
-    Start-Process -FilePath 'wscript.exe' -ArgumentList ('"' + $Launcher + '"') -WorkingDirectory $AppRoot
+    Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\wscript.exe') -ArgumentList ('"' + $Launcher + '"') -WorkingDirectory $AppRoot
     L "Application relancee apres mise a jour."
 } catch { L ("ECHEC updater : " + $_.Exception.Message) }
 '@
@@ -520,7 +558,7 @@ try {
 
         $argLine = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -AppPid {1} -Zip "{2}" -AppRoot "{3}" -Launcher "{4}" -LogPath "{5}"' -f `
             $updaterPs, $PID, $localZip, $appRoot, $launcher, $logPath
-        Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine -WindowStyle Hidden | Out-Null
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -ArgumentList $argLine -WindowStyle Hidden | Out-Null
         Write-AppLog ("[MAJ] Updater lancé (vers {0}). Fermeture de l'application." -f $m.Version)
         try { $form.Close() } catch { }
         [System.Windows.Forms.Application]::Exit()

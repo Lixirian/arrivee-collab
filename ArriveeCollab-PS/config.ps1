@@ -7,7 +7,7 @@ $Config = @{
     # Version de l'application. À INCRÉMENTER à chaque build (build-zip.ps1).
     # Au lancement, si elle diffère de la version persistée dans state.json,
     # l'app déclenche le dialogue « Quoi de neuf » (via lib/Update.ps1).
-    Version                = '1.12.0'
+    Version                = '1.13.0'
 
     # ----- Mise à jour : canal PRINCIPAL GitHub -----
     # Dépôt GitHub PUBLIC 'owner/repo'. build-zip.ps1 y crée une release v<X>

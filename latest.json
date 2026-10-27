@@ -1,12 +1,14 @@
 ﻿{
-    "version":  "1.12.0",
-    "zip":  "Arrivee-Collab_version1.12.0.zip",
-    "sha256":  "112BF65D46EB5FA3CAC4272E6911A1FDD0F6A185575771FFB57FE2AF3E08A63F",
-    "sig":  "YzYSghSp1GqfylmH9HBv9q+YuB5jTgKWqu7kbBj6WiMY7dQMxpPnWAYXq8keb53wRLIKU7hql51YDoRwgUm3B/j2Zg4n6ZYfoE9HbHGK6l/dSaBLctjqIco0PMynGhF7JaQ/HwMOdgE3Uqiaf4xN1lWOl4V7MFK5BafRdS5QJR1adUFMpph1jZPZDNYJOXfun7LwIAXa04wmNmksxdZjXmKqBbi2vfZ4zgMk17CV/ednAeJMHOukZFHC+m5O8dKv6L/Op2EniJsVFp3wh6dfRcc+MW1BOE5asY/kqS4wRQGwGrtYdO+i5oSvUnK/FFv8oF6BzP+YbQYqaHR44xr2LgHh98WrGMrkNz61psvmnopRlzD0Dnit25YlBfrNcqhqSOvMJ1FKQYl4piZolICJR+xB6eN7b68GrSbJigwiZroFA50I92qtB00TERA2DJAUeVmv7O1oKd3B/Kt0HSMszOfScYmyF+4/Lmr+wV/d50pcwbOyPrmc5330ED5p4PWi",
+    "version":  "1.13.0",
+    "zip":  "Arrivee-Collab_version1.13.0.zip",
+    "sha256":  "73864C18B02CDAED07CDC6EEC53EAB5D2E253CA9EE4112641573BA45075190E7",
+    "sig":  "C+MDE7A4FHBhV1Rv2DtW1tGWEFLnPZjFu0HKbDwuqMgakhtYB+1xk0wAGv5IPyk86L2VfmN/xucnlqo2F15vcJ9njdfBROUMbzlJN3GrBUcJkGdD4y2RqyB/xe1mheDSDXbbVcPVakhWF1/bn3K0yh97/ogN9ut0xFIPexQlkMlT7fUd4u2fwVX9B1T3Vb+NaH8nlvYyWSKXVBpZjJmWruZYwvOepnuViHUmPhJulIj0zJlQjKLniSnBoMBawArfO9SVkbud3LL6m0AK2qWEhtFLuF5rBI/WEGtzq92F+KT3utQTi89K5HTPR/KwjGbbEHJsjlH1TwYvv8A4yTX4N2LvDAZICjyNfNx/vjINOjSMDT7GkuaFokjmIc6VMJAKjWp9rPPjmjTzImls4jYtPr+cNQ2aBEIi+B7bnPrrA6o38Mknm8XVg4xs5WZOAhs/fATLZPZ6K87ysJj2ILqt3srVfcOFabQbXS8LjgeTNsIuNa6DyqkNO0WNVbSuACjJ",
+    "msig":  "Xrq4TYv1TvNddDN4NJDwrhPeY6MrQSV4mYGSnWMXA6gyaVoLJNOa7YUg5vS5/m4h00DEwgKLYi9iaiH2AvmjXutnRBsq50tBVTnAYLlKJDHubVOqTOgS9MkbFmywgrW+B0rWdqVXKMBvnEJI4t3xfTV3OtFgfzKylAE7uxQfB6JY8tlAcXWqaBu7CzTxUARbbcZF/hUwA1bSMoS82cUidw31l8xrO1kHZRaRqBtDVKk0SXGGsqnqOdD3mlNS5hbVwk0/e42g2YTcmZi4wtAXtS1uZshLh31DienPbntM2GtryZoj/dh49QSEX6PckEcmMINnr5wjN9AC40//TKJRW1PKgI6pZaD5HLm1uqHhkRfdCLEjLYwkgRrdzaRAYHY9HCw2hnndmqaoMdXzIS4l7toIrwyG1RiATmKblWitoyB5Ypqs2FS8vWKDyrJi8luaBQfJNZ4zE/ovDuupkCLC2pqfYItNS57LERa7irWq2eVnvnSQbm54U3uaHiMtAsJg",
     "date":  "2026-10-27",
     "notes":  [
-                  "Vérification automatique des doublons de demande : dès que la RITM et le nom sont saisis, l\u0027outil cherche dans ServiceNow (en arrière-plan, avec votre connexion SSO) les tâches d\u0027arrivée du même bénéficiaire, en cours ou réalisées, rattachées à une autre RITM. Le résultat s\u0027affiche à droite du nouveau bouton « Vérif. doublons ».",
-                  "En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d\u0027annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour en choisir une autre ou écarter l\u0027alerte. Les notes ServiceNow et Utilisateur s\u0027adaptent, et l\u0027outil vous rappelle de passer la balise de la RITM à « Annulation - Doublon ». Un doublon l\u0027emporte sur les homonymes.",
-                  "Les deux vérifications ServiceNow (homonymes et doublons) sont regroupées sur une même ligne, sous le formulaire."
+                  "Vérifications ServiceNow plus fiables : la recherche attend que la page soit complètement prête, et en cas d\u0027absence de réponse ou de session expirée l\u0027outil relance automatiquement la synchronisation SSO puis réessaie.",
+                  "Sécurité renforcée suite à une revue complète : mot de passe toujours composé d\u0027une majuscule, d\u0027une minuscule, d\u0027un chiffre et d\u0027un caractère spécial (sans caractères ambigus) ; copié hors de l\u0027historique du presse-papiers (Win+V) et effacé au bout de 2 minutes ; fichiers temporaires du mot de passe supprimés automatiquement ; mails archivés conservés 30 jours.",
+                  "Contrôle des saisies avant génération du mail (numéro de RITM, nom et prénom, adresse du demandeur) et protection de l\u0027aperçu contre tout contenu piégé.",
+                  "La case « Réduction auto en bulle » est désormais bien visible (case violette)."
               ]
 }

@@ -271,8 +271,17 @@ if (-not (Test-Path $resourcesFolder)) {
 
 # Création automatique des sous-dossiers si nécessaire
 foreach ($folder in @($motDePasseFolder, $archiveFolder)) {
-    if (-not (Test-Path $folder)) { New-Item -Path $folder -ItemType Directory | Out-Null }
+    if (-not (Test-Path -LiteralPath $folder)) { New-Item -Path $folder -ItemType Directory | Out-Null }
 }
+
+# Hygiène des données sensibles au démarrage :
+#  - « Mot de passe » : .txt / .zip résiduels (génération abandonnée) => tout supprimer ;
+#  - « Archive message » : les .msg contiennent le mot de passe en pièce jointe =>
+#    conservés 30 jours seulement.
+$global:RetentionArchivesJours = 30
+$nPurgeMdp = Remove-FichiersAnciens $motDePasseFolder 0
+$nPurgeArch = Remove-FichiersAnciens $archiveFolder $global:RetentionArchivesJours '*.msg'
+if ($nPurgeMdp -or $nPurgeArch) { Write-AppLog "[SECU] Purge au démarrage : $nPurgeMdp fichier(s) de mot de passe, $nPurgeArch archive(s) de plus de $($global:RetentionArchivesJours) jours." }
 
 # Chemins des images
 $cheminHeader = Join-Path $resourcesFolder 'image arrivee collab.jpg'
@@ -611,27 +620,54 @@ function Show-DoublonsDialog {
     return $null
 }
 
-function Generate-Password {
-    $l=12
-    $pool = (48..57)+(65..90)+(97..122)+(33..38) | ForEach-Object {[char]$_}
-    -join (1..$l | ForEach-Object { $pool | Get-Random })
-}
+# Mot de passe : tirage cryptographique (New-MotDePasse, lib/Common.ps1).
+function Generate-Password { return (New-MotDePasse) }
 function Copy-Clipboard ($txt) { [System.Windows.Forms.Clipboard]::SetText($txt) }
+
+# Copie du MOT DE PASSE : exclu de l'historique Win+V et du presse-papiers cloud
+# (formats Windows dédiés), puis effacé au bout de 2 minutes s'il y est encore.
+function Copy-MotDePasseSecurise {
+    param([string]$Pw)
+    $do = New-Object Windows.Forms.DataObject
+    $do.SetText($Pw)
+    foreach ($fmt in 'ExcludeClipboardContentFromMonitorProcessing', 'CanIncludeInClipboardHistory', 'CanUploadToCloudClipboard') {
+        $do.SetData($fmt, (New-Object IO.MemoryStream(, [byte[]](0, 0, 0, 0))))
+    }
+    [Windows.Forms.Clipboard]::SetDataObject($do, $true)
+    $t = New-Object Windows.Forms.Timer
+    $t.Interval = 120000; $t.Tag = $Pw
+    $t.Add_Tick({
+        $this.Stop()
+        try { if ([Windows.Forms.Clipboard]::ContainsText() -and [Windows.Forms.Clipboard]::GetText() -eq $this.Tag) { [Windows.Forms.Clipboard]::Clear() } } catch { }
+        $this.Tag = $null; $this.Dispose()
+    })
+    $t.Start()
+}
+
+# Fichiers du mot de passe : nom assaini (ConvertTo-NomFichierSur), chemins littéraux.
 function Creer-FichierMotDePasse ($pw, $nomPrenom) {
-    $f = Join-Path $motDePasseFolder "$nomPrenom-motdepasse.txt"
-    Set-Content -Path $f -Value $pw
+    $f = Join-Path $motDePasseFolder "$(ConvertTo-NomFichierSur $nomPrenom)-motdepasse.txt"
+    Set-Content -LiteralPath $f -Value $pw
     return $f
 }
 function Creer-Zip ($txt, $nomPrenom) {
-    $z = Join-Path $motDePasseFolder "$nomPrenom.zip"
-    $d = Join-Path $env:TEMP "tempZipSNCF"
-    if (Test-Path $z) { Remove-Item $z -Force }
-    if (Test-Path $d) { Remove-Item $d -Force -Recurse }
-    New-Item $d -ItemType Directory | Out-Null
-    Copy-Item $txt -Destination (Join-Path $d "mot_de_passe.txt")
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($d, $z)
-    Remove-Item $d -Force -Recurse
+    $z = Join-Path $motDePasseFolder "$(ConvertTo-NomFichierSur $nomPrenom).zip"
+    $d = Join-Path $env:TEMP ("ac_zip_" + [guid]::NewGuid().ToString('N'))
+    if (Test-Path -LiteralPath $z) { Remove-Item -LiteralPath $z -Force }
+    New-Item -Path $d -ItemType Directory | Out-Null
+    try {
+        Copy-Item -LiteralPath $txt -Destination (Join-Path $d "mot_de_passe.txt")
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($d, $z)
+    } finally { Remove-Item -LiteralPath $d -Force -Recurse -ErrorAction SilentlyContinue }
     return $z
+}
+# Supprime le .txt et le .zip du mot de passe (le .msg contient déjà la pièce jointe).
+function Remove-FichiersMotDePasse {
+    foreach ($f in @($global:CheminFichierTxt, $global:CheminZip)) {
+        if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+    }
+    $global:CheminFichierTxt = $null
+    $global:CheminZip = $null
 }
 function Creer-FichierMsg ($sujet, $dest, $htmlBody, $zipPath, $sortie) {
     try {
@@ -640,7 +676,7 @@ function Creer-FichierMsg ($sujet, $dest, $htmlBody, $zipPath, $sortie) {
         $mail.Subject = $sujet
         $mail.To = $dest
         $mail.BodyFormat = 2
-        if ($zipPath -and (Test-Path $zipPath)) { $mail.Attachments.Add($zipPath) }
+        if ($zipPath -and (Test-Path -LiteralPath $zipPath)) { [void]$mail.Attachments.Add($zipPath) }
         $mail.HTMLBody = $htmlBody
         $mail.SaveAs($sortie, 3)
         [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($mail)
@@ -652,39 +688,38 @@ function Creer-FichierMsg ($sujet, $dest, $htmlBody, $zipPath, $sortie) {
         return $false
     }
 }
-function Attendre-FermetureOutlookEtDeplacer($cheminMsg) {
-    $watcherScript = @"
-    Start-Sleep -Seconds 5
-    `$fileToWatch = '$cheminMsg'
-    `$archiveFolder = '$archiveFolder'
-    `$fileName = [System.IO.Path]::GetFileName(`$fileToWatch)
-    `$archivePath = [System.IO.Path]::Combine(`$archiveFolder, `$fileName)
-    `$maxAttempts = 30
-    `$attempts = 0
-    `$success = `$false
-    while (-not `$success -and `$attempts -lt `$maxAttempts) {
-        try {
-            `$fileStream = [System.IO.File]::Open(`$fileToWatch, 'Open', 'ReadWrite', 'None')
-            `$fileStream.Close()
-            `$fileStream.Dispose()
-            if (Test-Path `$fileToWatch) {
-                if (Test-Path `$archivePath) { Remove-Item `$archivePath -Force }
-                Move-Item -Path `$fileToWatch -Destination `$archiveFolder -Force
-                `$success = `$true
-            } else { `$success = `$true }
-        } catch {
-            Start-Sleep -Seconds 2
-            `$attempts++
-        }
+# Archivage du .msg après fermeture dans Outlook : script détaché qui attend la
+# libération du fichier. Les chemins lui sont passés en PARAMÈTRES (jamais insérés
+# dans le code) et le script s'efface lui-même à la fin.
+$script:WatcherArchivage = @'
+param([string]$FileToWatch, [string]$ArchiveFolder)
+Start-Sleep -Seconds 5
+$archivePath = [System.IO.Path]::Combine($ArchiveFolder, [System.IO.Path]::GetFileName($FileToWatch))
+for ($attempts = 0; $attempts -lt 30; $attempts++) {
+    try {
+        $fs = [System.IO.File]::Open($FileToWatch, 'Open', 'ReadWrite', 'None'); $fs.Close(); $fs.Dispose()
+        if (Test-Path -LiteralPath $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
+        Move-Item -LiteralPath $FileToWatch -Destination $ArchiveFolder -Force
+        break
+    } catch {
+        if (-not (Test-Path -LiteralPath $FileToWatch)) { break }
+        Start-Sleep -Seconds 2
     }
-"@
-    $tempScriptPath = [System.IO.Path]::GetTempFileName() + ".ps1"
-    Set-Content -Path $tempScriptPath -Value $watcherScript
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$tempScriptPath`"" -WindowStyle Hidden
+}
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+'@
+function Attendre-FermetureOutlookEtDeplacer($cheminMsg) {
+    $tempScriptPath = Join-Path $env:TEMP ("ac_archive_" + [guid]::NewGuid().ToString('N') + ".ps1")
+    Set-Content -LiteralPath $tempScriptPath -Value $script:WatcherArchivage -Encoding UTF8
+    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    Start-Process -FilePath $ps -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+        '-File', "`"$tempScriptPath`"", '-FileToWatch', "`"$cheminMsg`"", '-ArchiveFolder', "`"$archiveFolder`"")
 }
 
 function Get-CorpsMessageHTML_Preview {
     param($objet, $nomPrenom, $cheminHeader, $cheminSignature)
+    # Saisies encodées : aucun balisage ne peut être injecté dans l'aperçu ni dans le mail.
+    $objet = [System.Net.WebUtility]::HtmlEncode([string]$objet); $nomPrenom = [System.Net.WebUtility]::HtmlEncode([string]$nomPrenom)
     return @"
 <html>
 <head>
@@ -739,6 +774,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 
 function Get-CorpsMessageHTML_Final {
     param($nomPrenom, $cheminHeader, $cheminSignature)
+    $nomPrenom = [System.Net.WebUtility]::HtmlEncode([string]$nomPrenom)
     return @"
 <html>
 <head>
@@ -782,6 +818,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 
 function Get-CorpsMessageHTML_DejaInit_Preview {
     param($objet, $nomPrenom, $dateInit, $cheminHeader, $cheminSignature)
+    $objet = [System.Net.WebUtility]::HtmlEncode([string]$objet); $nomPrenom = [System.Net.WebUtility]::HtmlEncode([string]$nomPrenom); $dateInit = [System.Net.WebUtility]::HtmlEncode([string]$dateInit)
     return @"
 <html>
 <head>
@@ -829,6 +866,7 @@ DIRECTION SERVICES NUMERIQUES<br/>
 
 function Get-CorpsMessageHTML_DejaInit_Final {
     param($nomPrenom, $dateInit, $cheminHeader, $cheminSignature)
+    $nomPrenom = [System.Net.WebUtility]::HtmlEncode([string]$nomPrenom); $dateInit = [System.Net.WebUtility]::HtmlEncode([string]$dateInit)
     return @"
 <html>
 <head>
@@ -1230,13 +1268,34 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
 # se replie en bulle à la perte de focus ; décochée = elle reste affichée. Synchronisée
 # dans les deux sens avec les menus contextuels via Set-AutoHideDisabled.
 $chkAutoBulle = New-Object Windows.Forms.CheckBox
-$chkAutoBulle.Text = "Réduction auto en bulle"
+$chkAutoBulle.Text = "  Réduction auto en bulle"
 $chkAutoBulle.Location = New-Object Drawing.Point(830, 100)
 $chkAutoBulle.Size = New-Object Drawing.Size(200, 28)
-$chkAutoBulle.ForeColor = $cTextSecondary
+$chkAutoBulle.ForeColor = $cTextPrimary
 $chkAutoBulle.BackColor = $cBgSecondary
 $chkAutoBulle.Font = [Drawing.Font]::new("Segoe UI", 9)
 $chkAutoBulle.FlatStyle = 'Flat'
+# Case lisible sur fond sombre : le rendu système (gris sur gris) est redessiné
+# par-dessus — contour violet décochée, remplie de violet avec coche blanche cochée.
+$chkAutoBulle.Add_Paint({
+    param($s, $e)
+    $g = $e.Graphics
+    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $t = 14; $y = [int](($s.ClientSize.Height - $t) / 2)
+    $g.FillRectangle((New-Object Drawing.SolidBrush($cBgSecondary)), -1, ($y - 2), ($t + 3), ($t + 4))
+    $box = New-Object Drawing.Rectangle(0, $y, $t, $t)
+    if ($s.Checked) {
+        $g.FillRectangle((New-Object Drawing.SolidBrush($cAccentViolet)), $box)
+        $pen = New-Object Drawing.Pen($cWhite, 2)
+        $g.DrawLines($pen, [Drawing.Point[]]@((New-Object Drawing.Point(3, ($y + 7))), (New-Object Drawing.Point(6, ($y + 10))), (New-Object Drawing.Point(11, ($y + 4)))))
+        $pen.Dispose()
+    } else {
+        $g.FillRectangle((New-Object Drawing.SolidBrush($cSurface)), $box)
+        $pen = New-Object Drawing.Pen($cAccentViolet, 1.5)
+        $g.DrawRectangle($pen, 0, $y, ($t - 1), ($t - 1))
+        $pen.Dispose()
+    }
+})
 $chkAutoBulle.Cursor = [Windows.Forms.Cursors]::Hand
 $chkAutoBulle.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
 $chkAutoBulle.Checked = -not [bool]$global:Ctx.State.AutoHideDisabled
@@ -1470,8 +1529,7 @@ $btnReset.Add_Click({
     $btnGenPwd.Enabled = $true
     $btnGenPwd.BackColor = $cAccentViolet
     $txtPwd.BackColor = $cSurface
-    $global:CheminFichierTxt = $null
-    $global:CheminZip = $null
+    Remove-FichiersMotDePasse
     $global:CopyDateInit = $null
     $global:CopyOU = "(à définir)"
     $global:CopyEmailBenef = "(à définir)"
@@ -1727,6 +1785,12 @@ $form.Controls.Add($panelPreview)
 $webBrowser = New-Object Windows.Forms.WebBrowser
 $webBrowser.Dock = 'Fill'
 $webBrowser.ScriptErrorsSuppressed = $true
+# Aperçu en lecture seule : aucune navigation hors du contenu généré (un lien cliqué
+# ne charge rien), pas de menu contextuel, de raccourcis ni de glisser-déposer.
+$webBrowser.IsWebBrowserContextMenuEnabled = $false
+$webBrowser.WebBrowserShortcutsEnabled = $false
+$webBrowser.AllowWebBrowserDrop = $false
+$webBrowser.Add_Navigating({ param($s, $e) if ($e.Url.AbsoluteUri -ne 'about:blank') { $e.Cancel = $true } })
 $panelPreview.Controls.Add($webBrowser)
 
 # --- Bouton « Copier tout » visible uniquement quand l'aperçu est masqué ---
@@ -1978,7 +2042,7 @@ function Set-ResultatHomonymes {
     $global:HomoComptes = $comptes
     $global:HomoCpDemande = $null
     if (Test-PresenceHomonymes $comptes) {
-        Write-AppLog "[HOMO] Homonymes pour « $NomPrenom » : $(($comptes | ForEach-Object { $_.user_name }) -join ', ')"
+        Write-AppLog "[HOMO] Homonymes détectés : $($comptes.Count) comptes au même nom."
         if ($global:HomoIgnore -eq (ConvertTo-NomNormalise $NomPrenom)) {
             Set-ModeHomonyme $false
             Set-StatutHomo 'ignore' "Homonymes écartés ($($comptes.Count) comptes) — cliquer pour revoir"
@@ -2059,7 +2123,7 @@ function Set-ResultatDoublons {
     $global:DoublonTaches = $taches
     if ($taches.Count -gt 0) {
         $ritms = @(Get-RitmsDoublons $taches)
-        Write-AppLog "[DOUBLON] « $nom » ($ritm) : déjà demandé dans $($ritms -join ', ') (champ(s) $(@($taches)[0].Champs))."
+        Write-AppLog "[DOUBLON] $ritm : demande déjà existante ($($ritms -join ', ')) ; champ bénéficiaire reconnu : $(@($taches)[0].Champs)."
         if ($global:DoublonIgnore -eq $Cle) {
             Set-ModeDoublon $false
             Set-StatutDoublon 'ignore' "Doublon écarté ($($ritms -join ', ')) — cliquer pour revoir"
@@ -2171,10 +2235,15 @@ Set-StatutDoublon 'idle' 'Saisir le nom et le prénom'
 
 # --- Événements ---
 $btnGenPwd.Add_Click({
+    if (-not (Test-NomPrenomValide $txtNomPrenom.Text)) {
+        Show-AlertDialog -message "Saisissez d'abord le nom et le prénom du collaborateur (lettres, espaces, apostrophes et tirets uniquement)." -title "Nom et prénom"
+        return
+    }
+    Remove-FichiersMotDePasse   # fichiers d'une génération précédente
     $pw = Generate-Password
     $txtPwd.Text = $pw
-    Copy-Clipboard $pw
-    Show-AlertDialog -message "Le mot de passe a été généré et copié dans le presse-papiers." -title "Mot de passe généré"
+    Copy-MotDePasseSecurise $pw
+    Show-AlertDialog -message "Le mot de passe a été généré et copié dans le presse-papiers.`n`nPar sécurité, il n'apparaît pas dans l'historique du presse-papiers (Win+V) et en sera effacé dans 2 minutes." -title "Mot de passe généré"
     $nomFichier = ($txtNomPrenom.Text -replace '\s', '')
     $global:CheminFichierTxt = Creer-FichierMotDePasse $pw $nomFichier
     $global:CheminZip = Creer-Zip $global:CheminFichierTxt $nomFichier
@@ -2193,6 +2262,19 @@ $btnGenMsg.Add_Click({
         Show-AlertDialog -message "Remplissez tous les champs !" -title "Erreur"
         return
     }
+    # Contrôle des saisies (elles finissent dans le mail, l'objet et les noms de fichiers).
+    if (-not (Test-NumeroRitmValide $ritm)) {
+        Show-AlertDialog -message "Le numéro de RITM « $ritm » n'est pas valide (attendu : RITM suivi de 7 à 10 chiffres)." -title "RITM"
+        return
+    }
+    if (-not (Test-NomPrenomValide $nomPrenom)) {
+        Show-AlertDialog -message "Le nom et prénom contient des caractères non autorisés (seuls les lettres, espaces, apostrophes, points et tirets sont acceptés)." -title "Nom et prénom"
+        return
+    }
+    if (-not (Test-AdresseMailValide $dest)) {
+        Show-AlertDialog -message "L'adresse du demandeur « $dest » n'est pas valide (une seule adresse électronique attendue)." -title "Email du demandeur"
+        return
+    }
 
     if ($global:ModeDoublon) {
         # --- Mode : doublon de demande -> mail d'annulation au demandeur, sans PJ ---
@@ -2209,7 +2291,7 @@ $btnGenMsg.Add_Click({
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
-                Invoke-Item $cheminMsg
+                Invoke-Item -LiteralPath $cheminMsg
                 Attendre-FermetureOutlookEtDeplacer $cheminMsg
             }
         }
@@ -2230,11 +2312,11 @@ $btnGenMsg.Add_Click({
         $webBrowser.DocumentText = Get-CorpsMessageHTML_Homonyme_Preview $objet $nomPrenom $global:HomoCpDemande $cpTrouves $cheminHeader $cheminSignature
         $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal "" $cheminMsg) {
-            Write-AppLog "[HOMO] Mail homonyme créé pour $ritm (demandé $($global:HomoCpDemande), trouvé $cpTrouves)."
+            Write-AppLog "[HOMO] Mail homonyme créé pour $ritm."
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
-                Invoke-Item $cheminMsg
+                Invoke-Item -LiteralPath $cheminMsg
                 Attendre-FermetureOutlookEtDeplacer $cheminMsg
             }
         }
@@ -2259,7 +2341,7 @@ $btnGenMsg.Add_Click({
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
-                Invoke-Item $cheminMsg
+                Invoke-Item -LiteralPath $cheminMsg
                 Attendre-FermetureOutlookEtDeplacer $cheminMsg
             }
         }
@@ -2278,7 +2360,7 @@ $btnGenMsg.Add_Click({
             Show-AlertDialog -message "Opération annulée. Veuillez réaliser les actions nécessaires avant de générer le message." -title "Opération annulée"
             return
         }
-        if (-not (Test-Path $global:CheminZip)) {
+        if (-not $global:CheminZip -or -not (Test-Path -LiteralPath $global:CheminZip)) {
             Show-AlertDialog -message "Générez le mot de passe d'abord." -title "Erreur"
             return
         }
@@ -2288,18 +2370,14 @@ $btnGenMsg.Add_Click({
         $webBrowser.DocumentText = $htmlPreview
         $cheminMsg = Join-Path $workDir "$ritm`_notif.msg"
         if (Creer-FichierMsg $objet $dest $htmlFinal $global:CheminZip $cheminMsg) {
+            # Le .msg embarque la pièce jointe : le .txt et le .zip en clair ne servent
+            # plus, ils sont supprimés systématiquement.
+            Remove-FichiersMotDePasse
             $rappelMsg = "Fichier .msg créé avec succès :`n$cheminMsg`n`nOuvrir le fichier maintenant ?"
             $resultatRappel = Show-AlertDialog -message $rappelMsg -title "MESSAGE CRÉÉ" -withCancel -buttonYesText "Ouvrir le fichier" -buttonNoText "Plus tard"
             if ($resultatRappel -eq [Windows.Forms.DialogResult]::Yes) {
-                Invoke-Item $cheminMsg
+                Invoke-Item -LiteralPath $cheminMsg
                 Attendre-FermetureOutlookEtDeplacer $cheminMsg
-            }
-            $cleanupMsg = "Voulez-vous supprimer les fichiers temporaires du dossier 'Mot de passe' ?`n`n- $($global:CheminFichierTxt)`n- $($global:CheminZip)"
-            $resultatCleanup = Show-AlertDialog -message $cleanupMsg -title "NETTOYAGE" -withCancel -buttonYesText "Oui, supprimer" -buttonNoText "Non, conserver"
-            if ($resultatCleanup -eq [Windows.Forms.DialogResult]::Yes) {
-                if (Test-Path $global:CheminFichierTxt) { Remove-Item $global:CheminFichierTxt -Force }
-                if (Test-Path $global:CheminZip) { Remove-Item $global:CheminZip -Force }
-                Show-AlertDialog -message "Fichiers temporaires supprimés avec succès." -title "Nettoyage terminé"
             }
         }
         # Demander les informations du bénéficiaire
@@ -2730,6 +2808,7 @@ $form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() }
 # Fermeture : libère le WebView2 caché (et ses processus msedgewebview2).
 # Dispose() plutôt que Close() : Close passerait par FormClosing qui re-cache la fenêtre.
 $form.Add_FormClosed({
+    try { Remove-FichiersMotDePasse } catch { }
     try { if ($global:Snow.Timer) { $global:Snow.Timer.Stop() } } catch { }
     try { if ($global:Snow.WebView) { $global:Snow.WebView.Dispose() } } catch { }
     try { if ($global:Snow.Form) { $global:Snow.Form.Dispose() } } catch { }

@@ -27,7 +27,7 @@ function Get-TutorialSteps {
            Text  = "Dès que la RITM et le nom sont saisis, l'outil cherche aussi dans ServiceNow les tâches d'arrivée (« Support Site… », « Recherche des nouveaux gestionnaires ») du même bénéficiaire, en cours ou réalisées, rattachées à une AUTRE RITM. Le résultat s'affiche à droite du bouton « Vérif. doublons ». En cas de doublon, une pastille rouge « DOUBLON » apparaît et le formulaire passe en mail d'annulation (« Générer mail doublon ») citant la RITM déjà existante ; cliquez la pastille pour choisir une autre RITM. N'oubliez pas ensuite de passer la balise de la RITM à « Annulation - Doublon » : l'outil vous le rappelle. Un doublon l'emporte sur les homonymes."
            Target = { $btnVerifDoublon } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F511)); Title = 'Générer le mot de passe'
-           Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères, le copie dans le presse-papiers et prépare un fichier .zip protégé à joindre au mail."
+           Text  = "Ce bouton crée un mot de passe aléatoire de 12 caractères (majuscule, minuscule, chiffre et caractère spécial garantis), le copie dans le presse-papiers et prépare le fichier .zip à joindre au mail. Par sécurité, il n'apparaît pas dans l'historique du presse-papiers (Win+V) et en est effacé au bout de 2 minutes."
            Target = { $btnGenPwd } }
         @{ Icon = ([char]::ConvertFromUtf32(0x26A0)); Title = 'Mot de passe déjà initialisé'
            Text  = "Si le compte possède déjà un mot de passe, cochez cette case. Mon-AD affiche le nombre de jours restants avant de devoir changer le mot de passe : saisissez simplement ce nombre de jours, l'outil en déduit et affiche la date d'initialisation (validité de 365 jours). Vous pouvez aussi l'ajuster avec les flèches ↑ et ↓. L'outil enverra alors un mail différent (sans pièce jointe) au lieu de générer un nouveau mot de passe."
@@ -36,7 +36,7 @@ function Get-TutorialSteps {
            Text  = "Avant de générer le .msg, l'outil vous demande de confirmer que vous avez bien modifié le mot de passe dans Mon-AD et déplacé le compte dans la bonne OU."
            Target = { $null } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F4E7)); Title = 'Générer le .msg'
-           Text  = "Ce bouton crée l'e-mail Outlook de notification (avec le .zip en pièce jointe) et met à jour la note ServiceNow. Le .msg est archivé automatiquement après envoi."
+           Text  = "Ce bouton crée l'e-mail Outlook de notification (avec le .zip en pièce jointe) et met à jour la note ServiceNow. Le .msg est archivé automatiquement après envoi (conservé 30 jours), et les fichiers temporaires du mot de passe sont supprimés aussitôt."
            Target = { $btnGenMsg } }
         @{ Icon = ([char]::ConvertFromUtf32(0x1F464)); Title = 'Informations bénéficiaire'
            Text  = "Après la création du .msg, une fenêtre vous demande l'adresse de messagerie et l'OU du bénéficiaire (liste déroulante des entités SudEst) pour compléter la note ServiceNow."
