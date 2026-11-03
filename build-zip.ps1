@@ -181,6 +181,11 @@ foreach ($rel in $fichiers) {
     if (-not (Test-Path -LiteralPath $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
     Copy-Item -LiteralPath (Join-Path $repo $rel) -Destination $dst -Force
 }
+# Lanceur local livré dans le paquet signé (app\launcher) : le lanceur et l'application
+# le copient dans %LOCALAPPDATA%\Arrivee-Collab\launcher, cible des raccourcis.
+$stLauncher = Join-Path $staging 'launcher'
+New-Item -ItemType Directory -Path $stLauncher -Force | Out-Null
+foreach ($f in @('bootstrap.ps1', 'Arrivee Collab.vbs')) { Copy-Item -LiteralPath (Join-Path $repo "dist-launcher\$f") -Destination $stLauncher -Force }
 
 $zip = Join-Path $repo "$name.zip"
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
@@ -225,14 +230,18 @@ $cmdHeader = @'
 @echo off
 REM ============================================================
 REM  Arrivee Collaborateur - UN SEUL FICHIER : double-cliquer.
-REM  Installe la derniere version signee depuis GitHub (premiere
-REM  installation) puis lance l'application. Les mises a jour
-REM  suivantes passent par la pastille de l'application.
+REM  Installe la derniere version signee si besoin, cree les
+REM  raccourcis puis lance l'application. Aucun .exe, aucun droit
+REM  administrateur, aucun identifiant stocke.
+REM  Options : /repair (reinstaller) ; /nostart (installer sans lancer)
 REM  Fichier GENERE par build-zip.ps1 (dist-launcher\bootstrap.ps1).
 REM ============================================================
 setlocal
 set "AC_SELF=%~f0"
-start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$s=[IO.File]::ReadAllText($env:AC_SELF,[Text.Encoding]::UTF8); $i=$s.IndexOf('#'+'#ARRIVEECOLLAB-PS#'+'#'); & ([ScriptBlock]::Create($s.Substring($i)))"
+set "ACARGS="
+if /i "%~1"=="/repair" set "ACARGS=-Repair"
+if /i "%~1"=="/nostart" set "ACARGS=-NoStart"
+start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$s=[IO.File]::ReadAllText($env:AC_SELF,[Text.Encoding]::UTF8); $i=$s.IndexOf('#'+'#ARRIVEECOLLAB-PS#'+'#'); & ([ScriptBlock]::Create($s.Substring($i))) %ACARGS%"
 exit /b
 ##ARRIVEECOLLAB-PS##
 '@
@@ -241,13 +250,13 @@ $cmdText = (($cmdHeader.TrimEnd() + "`n" + $bsText) -replace "`r`n", "`n") -repl
 [IO.File]::WriteAllText((Join-Path $repo 'dist-launcher\Arrivee Collab.cmd'), $cmdText, (New-Object System.Text.UTF8Encoding $false))
 
 # Assemble dist-ready\ : lanceur (.cmd unique + LISEZMOI) + zip courant + latest.json.
-# bootstrap.ps1 = source du .cmd, non distribué ; l'ancien lanceur en 3 fichiers est retiré.
+# bootstrap.ps1 (source du .cmd) et le .vbs (livré dans le zip, launcher\) ne sont pas distribués seuls.
 $ready = Join-Path $repo 'dist-ready'
 if (-not (Test-Path -LiteralPath $ready)) { New-Item -ItemType Directory -Path $ready -Force | Out-Null }
 Get-ChildItem -LiteralPath $ready -Filter 'Arrivee-Collab_version*.zip' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -ne "$name.zip" } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
 foreach ($old in @('bootstrap.ps1', 'Arrivee Collab.vbs')) { Remove-Item -LiteralPath (Join-Path $ready $old) -Force -ErrorAction SilentlyContinue }
-Copy-Item -Path (Join-Path $repo 'dist-launcher\*') -Destination $ready -Recurse -Force -Exclude 'bootstrap.ps1'
+Copy-Item -Path (Join-Path $repo 'dist-launcher\*') -Destination $ready -Recurse -Force -Exclude 'bootstrap.ps1', 'Arrivee Collab.vbs'
 Copy-Item -LiteralPath $zip -Destination $ready -Force
 Copy-Item -LiteralPath (Join-Path $repo 'latest.json') -Destination $ready -Force
 

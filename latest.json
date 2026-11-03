@@ -1,11 +1,12 @@
 ﻿{
-    "version":  "1.13.3",
-    "zip":  "Arrivee-Collab_version1.13.3.zip",
-    "sha256":  "7E4A2546968AC6162D6EF030D46F6F5E9B4D552A5BEFBF6F21F0174FFBAB621B",
-    "sig":  "gFpXtHHmT5qpYSekQMsPX7uAr99XDyDHC0X7/xnJdXwceUh0Gom2e/viL1GyoIkEgG9q8MrF3ps7OoX28fwVDDDOAEf3ts1p4CQOWHlxMm55VT6X8ZXNC7ozVzZ4mp5K3MNJ2GDCQQQ2KDjhP8WBG1u/EwYWtyEWhP3LaOo5db32GO4UF8PeVXky5Y+UJWUx28VCbLoEiBBeexEjum1cIflel6BePoZeE0hlzRWqnQur/cpSQxdmBSMF16oTNu44Z/borSi5j2RX4RL9kALWtpFDBmP8gecwT8PDXEzocSmS53WJJEFCyCeHrb/7r/Mp0eppC4wPlkdv3IFOx46Z2Ebidcss4AQNawyFw4Y14TjiaBPRRvJmkdGRSPXTWQ8KvYow5CnkO+SVWjv6EYDLsQCecTMoCnH5ODGrah4JZ4b5fbazD5kUoswgfq6dN6ezBBiEFK+siotW+FMZ4wp1FEIlI7zoxfpWrR8F5eWVGqWOgIqDixi9JhcOzrm/qEVv",
-    "msig":  "clEoV5aPX/uO6CiwjBpeY06aRHgkV8pdE1ma5IUDbbKfQs0j9f2OkMhVeL56+0CUpVszduFIneueH2u5UsuXNgv/yTp7oWir8zhpC10R42xMN0IX9opoExPDBEW7+vlfAOl16e7D1aI9Zx3EIPeRovun+4as52PIh0yZHYoI097t+8QA7O5YAjFEhzQyAw4SzpGYTGESKKT2M9Nfxbag0qJSPC00UfcJSqFwHwgJLZLZJgv4ewI9huRvH08Qx1vN/SF2BmpJnrQE2zOHimoE5ZBB8KS+PCyPUcNslt5HDHmT/2OhBmU7iIDIhs6qX3tfC/G6xCCzG5v9Wej1LyEbV5pLT8BKERnZ3GpKyNJmp1GGCG/DkZqgu7yuGYh/p2Q7GtwnIsMhU6VHjFhJwdtAdlKzM/bzrfllcW4hVFDapDzfgJ7BBkMwOrI8fqy+f5V1+3ZCfF4SZT1TWX0pfAlhIqHryvK7F8E44Z37Tvv8EYOwLE8mvdeHvRPU/aNM6l0T",
-    "date":  "2026-10-27",
+    "version":  "1.14.0",
+    "zip":  "Arrivee-Collab_version1.14.0.zip",
+    "sha256":  "98F49223D536D69C7848158CA02B1849BD450B46993B3E46A10044456DC09E43",
+    "sig":  "G0pC8837Hh5OO3VIKWwmgVeoEAv1Wxtktf6g20RNR1lQSIQhZlIeh4EumZ+cwdZCDKTZOo57oTL/7A5zaoFmCco1pMAYGprpvqzabgpA9H1Pqfn1k8D+jolE1lb4AwFdrlQw+b127F+2vBQ8xX1xQX1BjeS2JSyeB9qIq+uiYeh4yqw2sVmS3JBjN0AedtEpBws6m3P4XfDEU4172v+UokJYUu+97yTMB9JDFwfABIVBS8pzWg5yJ/Vu2jluX/INUbpGuidepLTKSysEXNVyqz2xQffyg5j+ZR9JmG6TgZxuKPYAFzJqMNSFwIOR+O9V8FakHZa6yXyc1wBb9MOubCnIXdB2mk/rg1y+mEaRGsID/KfpBcessEn4J5zVSeYdiE5D6a2HEEu1AQZJ8nWs3+rqWQBiBH/jYJRaVeLq2w6NkwDjO0viGK2cLOFVkw5SFpql1XNpmok4ocebX6XfN/es8tYrDy0GOQn7x5q0gCHcnXR7TwI+B68M0v/CF7MV",
+    "msig":  "nQyUGU20Osyd0W/3vZOWbkfV5RS2vR/yJa6dscFY5vXuafZ56rB3G7mqvp0mVGimxI4cvhMNqh2BCrgsvuh5SSKOYXDvs+XosWQf2Dd1LHY+gdoxlxc0i3hVSi7ks/hLR4wQm0j1PT/E/biEHurT32ZPOxOwDd2PuL9ke7RCa87xs7c6/IyCuEc5nOhElLDNEudYcyJnBGskdz4FldJ3NqOSnIi5xb7z4rYKdPsoAx98AaljB8mbetfJcTx9GzgSAKgYNwtFy+uLudOW0GwYgBJQ7RNJ6EsR16Dl4Vv8u4b9nJKsUf/3jfe+MqJ25eLXi0eBVj655czCwF7I3tub/7oZqGf/DHWlRFiNwYc2elqcc/XIuZFNbTbNHbDdY6RJRFkMhQxf4C5OBfij8tCN+jn0llKuJpYDNVb0A4aBArRDcBZe9pWt/Rr2s7s6Du34e/ksJ7YDtmFwNrvK9/0qvCXBlmG+4Ou2xef9WDlwXhH3zvsMnGScld0mSgNRGWNJ",
+    "date":  "2026-11-03",
     "notes":  [
-                  "Plus aucun message conservé par l\u0027outil : le mail préparé (.msg) est supprimé dès qu\u0027Outlook le libère (après envoi ou fermeture) ; la copie de référence reste dans vos Éléments envoyés. Les anciens messages archivés sont supprimés au prochain démarrage."
+                  "Installation simplifiée : il suffit désormais de double-cliquer une fois « Arrivee Collab.cmd » depuis le SharePoint. L\u0027outil s\u0027installe, puis crée un raccourci « Arrivée Collab » sur le Bureau et dans le menu Démarrer (aucun droit administrateur).",
+                  "Le raccourci fonctionne sans le SharePoint et répare tout seul une installation abîmée. En cas d\u0027échec de l\u0027installation, un message explique désormais le problème au lieu de ne rien afficher."
               ]
 }

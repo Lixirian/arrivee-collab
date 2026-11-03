@@ -1,4 +1,8 @@
 ﻿{
+    "1.14.0": [
+        "Installation simplifiée : il suffit désormais de double-cliquer une fois « Arrivee Collab.cmd » depuis le SharePoint. L'outil s'installe, puis crée un raccourci « Arrivée Collab » sur le Bureau et dans le menu Démarrer (aucun droit administrateur).",
+        "Le raccourci fonctionne sans le SharePoint et répare tout seul une installation abîmée. En cas d'échec de l'installation, un message explique désormais le problème au lieu de ne rien afficher."
+    ],
     "1.13.3": [
         "Plus aucun message conservé par l'outil : le mail préparé (.msg) est supprimé dès qu'Outlook le libère (après envoi ou fermeture) ; la copie de référence reste dans vos Éléments envoyés. Les anciens messages archivés sont supprimés au prochain démarrage."
     ],

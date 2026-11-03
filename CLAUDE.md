@@ -22,7 +22,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\Test-ArriveeCollab.ps1
 .\build-zip.ps1
 ```
 
-**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` — **fichier unique** (comme `Biblio-Tech.cmd`), copié depuis `dist-launcher/` ou `dist-ready/`, posé **seul** n'importe où (dossier OneDrive partagé, bureau…), sans .vbs ni bootstrap.ps1 à côté. Il est **généré par `build-zip.ps1`** : en-tête batch (`AC_SELF=%~f0`, PowerShell masqué qui relit le .cmd et exécute ce qui suit le marqueur `##ARRIVEECOLLAB-PS##`) + `dist-launcher/bootstrap.ps1` tel quel — ne jamais éditer le .cmd à la main, modifier `bootstrap.ps1` (où `$dist` = dossier du .cmd via `$env:AC_SELF`, `$PSScriptRoot` étant vide). Le bootstrap lit `latest.json` sur le **dépôt GitHub public** (`Config.UpdateRepo`, via raw.githubusercontent.com, sans jeton ; repli : fichiers posés à côté du .cmd), installe l'app (première installation uniquement) sous `%LOCALAPPDATA%\Arrivee-Collab\` puis la lance. Les mises à jour ultérieures se font via la pastille in-app : l'app interroge périodiquement GitHub (repli dossier OneDrive) et propose d'installer la nouvelle version.
+**Lancement utilisateur final** : double-clic sur `Arrivee Collab.cmd` depuis le SharePoint — **fichier unique** (même modèle que `SNOW Widget.cmd` et `Biblio-Tech.cmd`), copié depuis `dist-launcher/` ou `dist-ready/`, posé **seul** n'importe où, sans .vbs ni bootstrap.ps1 à côté. Il est **généré par `build-zip.ps1`** : en-tête batch (`AC_SELF=%~f0`, options `/repair` et `/nostart`, PowerShell masqué qui relit le .cmd et exécute ce qui suit le marqueur `##ARRIVEECOLLAB-PS##`) + `dist-launcher/bootstrap.ps1` tel quel — ne jamais éditer le .cmd à la main, modifier `bootstrap.ps1`. Le bootstrap n'installe que si la copie locale `%LOCALAPPDATA%\Arrivee-Collab\app` est absente, incomplète (`Test-BootHealthy`), antérieure à `$MinVersion` ou sur `/repair` (`latest.json` du **dépôt GitHub public**, sans jeton ; repli : fichiers à côté du .cmd), puis crée les raccourcis **« Arrivée Collab »** Bureau + Menu Démarrer et lance l'app. Les raccourcis ciblent le **lanceur local** `%LOCALAPPDATA%\Arrivee-Collab\launcher\` (`Arrivee Collab.vbs` + `bootstrap.ps1`, livrés dans le zip sous `launcher\`, recopiés par `Sync-AppLauncher` à chaque démarrage de la copie installée) : **ne jamais pointer un raccourci vers le dossier partagé**. Ils sont créés quand le .cmd est lancé directement ou à une installation, jamais depuis un raccourci (un raccourci supprimé ne revient pas seul). Pas de mise à jour forcée au-delà de `$MinVersion` : les suivantes passent par la pastille in-app (GitHub, repli dossier OneDrive).
 
 ## Publier une mise à jour (démarche OBLIGATOIRE pour toute évolution)
 
@@ -60,7 +60,8 @@ ArriveeCollab-PS/          ← code source
 
 dist-launcher/             ← lanceur
   Arrivee Collab.cmd       ← FICHIER UNIQUE distribué (GÉNÉRÉ par build-zip.ps1 = en-tête + bootstrap.ps1)
-  bootstrap.ps1            ← source du lanceur (première installation sous %LOCALAPPDATA%), non distribué seul
+  Arrivee Collab.vbs       ← lanceur local (cible des raccourcis), livré dans le zip sous `launcher\`, non distribué seul
+  bootstrap.ps1            ← source du lanceur (installation/réparation sous %LOCALAPPDATA%, raccourcis), non distribué seul
   LISEZMOI.txt
 
 build-zip.ps1              ← packaging : zip versionné + latest.json + dist-ready/
@@ -78,6 +79,7 @@ L'app écrit toutes ses sorties sous `%LOCALAPPDATA%\Arrivee-Collab\` :
 - `app\` — copie de `ArriveeCollab-PS/` (écrasée lors des mises à jour par `lib/Update.ps1`)
 - `data\Mot de passe\` — .txt et .zip temporaires du mot de passe
 - (plus d'archivage depuis 1.13.3 : le `{RITM}_notif.msg` est supprimé dès qu'Outlook le libère ; l'ancien `data\Archive message\` est purgé au démarrage)
+- `launcher\` — copie locale du lanceur (cible des raccourcis Bureau / Menu Démarrer)
 - `state.json` — état persistant (version installée…)
 - `app_debug.log` — journal de débogage
 

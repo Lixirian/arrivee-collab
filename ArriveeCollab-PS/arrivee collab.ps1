@@ -111,6 +111,7 @@ $dataDir = Get-AppDataDir
 $workDir = Get-AppWorkDir $dataDir
 Initialize-AppLog (Join-Path $dataDir 'app_debug.log')
 Write-AppLog "[INIT] App : $baseDir | Données : $dataDir"
+try { [void](Sync-AppLauncher -AppRoot $baseDir -DataDir $dataDir) } catch { Write-AppLog "[INIT] Lanceur local non synchronisé : $($_.Exception.Message)" }
 
 # Active l'historique du presse-papiers (Win+V) s'il est désactivé : indispensable
 # pour que le bouton « Copier tout » y place les deux notes. Best-effort, non bloquant.

@@ -320,6 +320,36 @@ Assert (Test-TutorialDue @{ TutorialSeenVersion = 0 } 1) 'tuto : jamais vu -> af
 Assert (-not (Test-TutorialDue @{ TutorialSeenVersion = 1 } 1)) 'tuto : deja vu version courante -> pas affiche'
 Assert (Test-TutorialDue @{ TutorialSeenVersion = 1 } 2) 'tuto : contenu plus recent -> reaffiche'
 
+# --- Lanceur local (cible des raccourcis) ---
+$lchTmp = Join-Path $env:TEMP ('ac_lch_' + [guid]::NewGuid().ToString('N'))
+try {
+    $lchApp = Join-Path $lchTmp 'app'
+    New-Item -ItemType Directory -Path (Join-Path $lchApp 'launcher') -Force | Out-Null
+    Assert ((Sync-AppLauncher -AppRoot $lchApp -DataDir $lchTmp) -eq $false) 'lanceur : paquet sans launcher\ -> aucune copie'
+    Set-Content -LiteralPath (Join-Path $lchApp 'launcher\bootstrap.ps1') -Value 'v1'
+    Set-Content -LiteralPath (Join-Path $lchApp 'launcher\Arrivee Collab.vbs') -Value 'v1'
+    $autreRacine = Join-Path $lchTmp 'sources'
+    New-Item -ItemType Directory -Path (Join-Path $autreRacine 'launcher') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $autreRacine 'launcher\bootstrap.ps1') -Value 'dev'
+    Assert ((Sync-AppLauncher -AppRoot $autreRacine -DataDir $lchTmp) -eq $false) 'lanceur : hors copie installee -> aucune copie'
+    Assert (-not (Test-Path -LiteralPath (Join-Path $lchTmp 'launcher'))) 'lanceur : rien cree depuis les sources'
+    Assert ((Sync-AppLauncher -AppRoot ($lchApp + '\') -DataDir $lchTmp) -eq $true) 'lanceur : copie installee -> copie faite'
+    Assert ((Test-Path -LiteralPath (Join-Path $lchTmp 'launcher\bootstrap.ps1')) -and (Test-Path -LiteralPath (Join-Path $lchTmp 'launcher\Arrivee Collab.vbs'))) 'lanceur : les deux fichiers copies'
+    Set-Content -LiteralPath (Join-Path $lchApp 'launcher\bootstrap.ps1') -Value 'v2'
+    [void](Sync-AppLauncher -AppRoot $lchApp -DataDir $lchTmp)
+    Assert ((Get-Content -LiteralPath (Join-Path $lchTmp 'launcher\bootstrap.ps1')) -eq 'v2') 'lanceur : remplace apres une mise a jour'
+} finally { Remove-Item -LiteralPath $lchTmp -Recurse -Force -ErrorAction SilentlyContinue }
+
+$bsPath = Join-Path $PSScriptRoot '..\dist-launcher\bootstrap.ps1'
+$bsErr = $null; $bsTok = $null
+[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $bsPath).Path, [ref]$bsTok, [ref]$bsErr)
+Assert ($bsErr.Count -eq 0) 'lanceur : bootstrap.ps1 sans erreur de syntaxe'
+$bsTxt = [IO.File]::ReadAllText((Resolve-Path $bsPath).Path, [Text.Encoding]::UTF8)
+$bsMin = [regex]::Match($bsTxt, "\`$MinVersion\s*=\s*'([^']+)'").Groups[1].Value
+$cfgVer = [regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\ArriveeCollab-PS\config.ps1'), [Text.Encoding]::UTF8), "Version\s*=\s*'([^']+)'").Groups[1].Value
+Assert ([version]$bsMin -le [version]$cfgVer) 'lanceur : version minimale <= version publiee'
+Assert (Test-Path -LiteralPath (Join-Path $PSScriptRoot '..\dist-launcher\Arrivee Collab.vbs')) 'lanceur : .vbs local present'
+
 # --- Should-AutoHide (décision de masquage auto) ---
 Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $true)  'autohide : autre processus => masquer'
 Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 1234 -OwnPid 1234) -eq $false) 'autohide : meme processus (dialogue/calendrier) => non'

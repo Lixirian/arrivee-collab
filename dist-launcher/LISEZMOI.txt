@@ -2,18 +2,25 @@ Arrivee Collaborateur - Lanceur
 ===============================
 
 UN SEUL FICHIER A DISTRIBUER : "Arrivee Collab.cmd"
-  A poser n'importe ou (bureau, dossier OneDrive, partage...), seul.
-  Aucun autre fichier n'est necessaire a cote (ni .vbs, ni bootstrap.ps1).
+  A poser sur le SharePoint (ou n'importe ou : partage, dossier OneDrive...), seul.
+  Aucun autre fichier n'est necessaire a cote.
 
 UTILISATION (cote utilisateur)
-  Double-cliquer "Arrivee Collab.cmd" (ou un raccourci vers lui). Le lanceur :
-    1. lit latest.json sur GitHub (release, puis depot) ;
-    2. si la copie locale (%LOCALAPPDATA%\Arrivee-Collab\app) n'existe pas,
-       telecharge la derniere version, controle son empreinte SHA-256 et la
-       signature de l'editeur, puis l'installe ;
+  Double-cliquer une fois "Arrivee Collab.cmd" depuis le SharePoint. Le lanceur :
+    1. si la copie locale (%LOCALAPPDATA%\Arrivee-Collab\app) est absente, incomplete
+       ou trop ancienne : telecharge la derniere version depuis GitHub, controle son
+       empreinte SHA-256 et la signature de l'editeur, puis l'installe ;
+    2. cree les raccourcis "Arrivee Collab" sur le Bureau et dans le menu Demarrer ;
     3. demarre l'application (sans fenetre console).
+  Ensuite, utiliser le raccourci : il ne depend plus du SharePoint et repare seul
+  une copie locale abimee. Un raccourci supprime revient en relancant le .cmd.
   Les mises a jour suivantes se font via la pastille "MAJ" de l'application.
+  Aucun droit administrateur n'est demande.
   Journal du lanceur : %LOCALAPPDATA%\Arrivee-Collab\bootstrap.log
+
+OPTIONS (depuis une invite de commandes)
+  "Arrivee Collab.cmd" /repair    reinstalle la derniere version
+  "Arrivee Collab.cmd" /nostart   installe sans lancer l'application ni creer de raccourci
 
 REPLI HORS GITHUB (optionnel)
   Si GitHub est inaccessible, le lanceur lit latest.json et
@@ -22,4 +29,6 @@ REPLI HORS GITHUB (optionnel)
 PUBLIER UNE NOUVELLE VERSION (cote mainteneur)
   build-zip.ps1 regenere "Arrivee Collab.cmd" (en-tete + dist-launcher\bootstrap.ps1),
   le zip signe et latest.json, puis publie sur GitHub. Le .cmd ne se met pas a
-  jour tout seul : le redistribuer seulement si le bundle est marque "COMPLET".
+  jour tout seul : le redeposer sur le SharePoint seulement si le bundle est marque
+  "COMPLET". Le fichier dist-launcher\Arrivee Collab.vbs n'est pas a distribuer :
+  il est livre dans le zip (launcher\) et copie en local par le lanceur.

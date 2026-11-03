@@ -23,6 +23,25 @@ function Get-AppWorkDir {
     return $dir
 }
 
+# Copie le lanceur livré avec l'app (app\launcher) dans <DataDir>\launcher, cible des
+# raccourcis Bureau / Menu Démarrer : ils profitent ainsi du lanceur de la version
+# installée, y compris après une mise à jour par la pastille. Copie installée uniquement
+# (jamais depuis les sources). Renvoie $true si la copie a été faite.
+function Sync-AppLauncher {
+    param([string]$AppRoot, [string]$DataDir)
+    $installee = [IO.Path]::GetFullPath((Join-Path $DataDir 'app')).TrimEnd('\')
+    if ([IO.Path]::GetFullPath($AppRoot).TrimEnd('\') -ine $installee) { return $false }
+    $src = Join-Path $AppRoot 'launcher'
+    if (-not (Test-Path -LiteralPath (Join-Path $src 'bootstrap.ps1'))) { return $false }
+    $dst = Join-Path $DataDir 'launcher'
+    if (-not (Test-Path -LiteralPath $dst)) { New-Item -ItemType Directory -Path $dst -Force | Out-Null }
+    foreach ($f in @('bootstrap.ps1', 'Arrivee Collab.vbs')) {
+        $s = Join-Path $src $f
+        if (Test-Path -LiteralPath $s) { Copy-Item -LiteralPath $s -Destination (Join-Path $dst $f) -Force }
+    }
+    return $true
+}
+
 # Comparaison NUMÉRIQUE de deux versions "x.y.z" (1.0.10 > 1.0.2). Renvoie -1 / 0 / 1.
 function Compare-AppVersion {
     param([string]$A, [string]$B)
