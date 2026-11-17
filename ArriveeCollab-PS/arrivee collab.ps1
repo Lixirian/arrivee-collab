@@ -141,6 +141,36 @@ public static class AcTaskbar {
         string c = sb.ToString();
         return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd";
     }
+    // --- Origine d'une activation : dernière fenêtre au premier plan AVANT les nôtres ---
+    // Un clic sur le bouton de barre des tâches, sur sa MINIATURE (Windows 11) ou un
+    // Alt+Tab passe d'abord le premier plan à l'interface du shell (explorer.exe). Une
+    // réactivation spontanée par Windows vient, elle, d'une autre application.
+    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObj, int idChild, uint thread, uint time);
+    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr hmod, WinEventProc proc, uint pid, uint tid, uint flags);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    static WinEventProc _fgProc; static IntPtr _fgHook; static IntPtr _prevFg; static uint _ownPid;
+    public static void StartForegroundTracking() {
+        if (_fgHook != IntPtr.Zero) return;
+        _ownPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+        _fgProc = (h, ev, hwnd, o, c, t, tm) => { uint pid; GetWindowThreadProcessId(hwnd, out pid); if (pid != _ownPid) _prevFg = hwnd; };
+        _fgHook = SetWinEventHook(3, 3, IntPtr.Zero, _fgProc, 0, 0, 0);   // EVENT_SYSTEM_FOREGROUND, hors contexte
+    }
+    static string RootClass(IntPtr hwnd) {
+        var sb = new System.Text.StringBuilder(128); GetClassName(GetAncestor(hwnd, 2), sb, 128); return sb.ToString();
+    }
+    // Fenêtre d'interface du shell (barre des tâches, miniatures, Alt+Tab…), hors Bureau
+    // et fenêtres de l'Explorateur de fichiers (aussi hébergés par explorer.exe).
+    public static bool IsShellUi(IntPtr hwnd) {
+        if (hwnd == IntPtr.Zero) return false;
+        string c = RootClass(hwnd);
+        if (c == "Progman" || c == "WorkerW" || c == "CabinetWClass" || c == "ExploreWClass") return false;
+        if (c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd") return true;
+        uint pid; GetWindowThreadProcessId(hwnd, out pid);
+        try { return System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+    public static bool ActivatedFromShell() { return IsShellUi(_prevFg); }
+    public static string PrevForegroundClass() { return _prevFg == IntPtr.Zero ? "" : RootClass(_prevFg); }
     static readonly Guid FMT = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");   // System.AppUserModel.*
     static void Set(IPropertyStore ps, uint pid, string val) {
         PROPERTYKEY k = new PROPERTYKEY(); k.fmtid = FMT; k.pid = pid;
@@ -2592,6 +2622,7 @@ $bubble.Controls.Add($picBubble)
 # et un clic souris SUR la bulle (géré par MouseUp : tap = afficher, glisser = déplacer).
 $global:BubbleShownAt = [DateTime]::MinValue
 $global:AppClosing = $false
+try { [AcTaskbar]::StartForegroundTracking() } catch { Write-AppLog "[UI] Suivi du premier plan : échec ($($_.Exception.Message))" }
 $bubble.Add_HandleCreated({
     try {
         [AcTaskbar]::AddMinimizeBox($bubble.Handle)
@@ -2607,10 +2638,15 @@ $bubble.Add_Activated({
     if ([Windows.Forms.Control]::MouseButtons -ne [Windows.Forms.MouseButtons]::None) { return }
     if (([DateTime]::Now - $global:BubbleShownAt).TotalMilliseconds -lt 600) { return }
     # Windows réactive parfois la bulle de lui-même (fenêtre fermée, repli…) : on ne
-    # réagit qu'à un clic sur la barre des tâches (curseur dessus) ou à Alt+Tab.
+    # réagit qu'à une activation venue du shell (bouton ou MINIATURE de la barre des
+    # tâches, Alt+Tab), au curseur posé sur la barre des tâches, ou à Alt maintenu.
     $cur = [Windows.Forms.Cursor]::Position
     $alt = ([Windows.Forms.Control]::ModifierKeys -band [Windows.Forms.Keys]::Alt) -ne 0
-    if (-not $alt -and -not [AcTaskbar]::IsTaskbarAt($cur.X, $cur.Y)) { return }
+    $shell = $false; try { $shell = [AcTaskbar]::ActivatedFromShell() } catch { }
+    if (-not ($shell -or $alt -or [AcTaskbar]::IsTaskbarAt($cur.X, $cur.Y))) {
+        Write-AppLog ("[UI] Bulle activée sans clic barre des tâches (précédente : {0}) : ignoré" -f [AcTaskbar]::PrevForegroundClass())
+        return
+    }
     Show-App
 })
 # WinForms recalcule le style à chaque affichage : on y remet WS_MINIMIZEBOX.

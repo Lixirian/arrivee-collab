@@ -1,4 +1,7 @@
 ﻿{
+    "1.14.5": [
+        "Barre des tâches : un seul clic sur l'icône (ou sur sa miniature) suffit désormais pour ramener l'outil replié en bulle."
+    ],
     "1.14.4": [
         "Barre des tâches : quand l'outil se replie en bulle, son bouton ne clignote plus et un seul clic suffit pour ramener la fenêtre."
     ],
