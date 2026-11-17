@@ -97,6 +97,80 @@ Assert (-not (Test-SnowHoteAutorise 'file://C:/Windows/win.ini')) 'snow : file r
 $js = Get-SnowKickJs "/x.do?a=1&b='2'</script>"
 Assert ($js -match [regex]::Escape('fetch("/x.do?a=1\u0026b=\u00272\u0027\u003c/script\u003e"') -or $js -match 'fetch\("/x\.do\?a=1') 'snow : URL inseree comme litteral JS echappe'
 
+# --- Page ServiceNow : machine d'état, jamais bloquée (faux WebView2) ---
+# Faux contrôle : .Source + CoreWebView2.Navigate (journalisé) / ExecuteScriptAsync
+# (tâche jamais terminée = page figée).
+function New-FakeSnowWebView([string]$Source) {
+    $core = [pscustomobject]@{ Navs = New-Object System.Collections.ArrayList }
+    $core | Add-Member ScriptMethod Navigate { param($u) [void]$this.Navs.Add($u) }
+    $core | Add-Member ScriptMethod ExecuteScriptAsync { param($js) [pscustomobject]@{ IsCompleted = $false; Result = $null } }
+    return [pscustomobject]@{ Source = [uri]$Source; CoreWebView2 = $core }
+}
+function Reset-FakeSnow([string]$Phase, [string]$Source) {
+    $global:Snow.Phase = $Phase; $global:Snow.Pending = [ordered]@{}; $global:Snow.EnCours = $null; $global:Snow.Task = $null
+    $global:Snow.WebView = New-FakeSnowWebView $Source
+    $global:SnowStatuts = New-Object System.Collections.ArrayList
+    $global:Snow.OnStatut = @{
+        homo    = { param($e, $t) [void]$global:SnowStatuts.Add("homo:$e") }
+        doublon = { param($e, $t) [void]$global:SnowStatuts.Add("doublon:$e") }
+    }
+}
+$snowOk = 'https://sncf.service-now.com/now/nav/ui/classic/params/target/sys_user_list.do'
+
+# Resynchronisation alors que la page affiche DÉJÀ l'adresse de départ : rechargement réel.
+Reset-FakeSnow 'poll' $snowOk
+$global:Snow.EnCours = @{ Type = 'homo'; Cle = 'X'; Url = '/u'; Essais = 0 }
+Invoke-SnowResync 'session expiree'
+Assert ($global:Snow.WebView.CoreWebView2.Navs.Count -eq 1 -and $global:Snow.Phase -eq 'init' -and $global:Snow.Pending.Contains('homo')) 'snow : resynchro = vrai rechargement meme sur la meme adresse'
+
+# Page sortie de l'instance pendant l'inactivité : rechargée au lieu d'attendre sans fin.
+Reset-FakeSnow 'ready' 'https://idp.sncf.fr/openam/XUI/'
+$global:Snow.Pending['homo'] = @{ Type = 'homo'; Cle = 'X'; Url = '/u'; Essais = 0 }
+Step-SnowPump
+Assert ($global:Snow.Phase -eq 'init' -and $global:Snow.WebView.CoreWebView2.Navs.Count -eq 1 -and $global:Snow.Pending.Contains('homo')) 'snow : page hors instance -> rechargement, demande conservee'
+
+# Chargement sans réponse : erreur affichée sur les vérifications en attente seulement.
+Reset-FakeSnow 'init' $snowOk
+$global:Snow.Pending['doublon'] = @{ Type = 'doublon'; Cle = 'X'; Url = '/u'; Essais = 0 }
+$global:Snow.Deadline = (Get-Date).AddSeconds(-1)
+Step-SnowPump
+Assert ($global:Snow.Phase -eq 'error' -and ($global:SnowStatuts -contains 'doublon:erreur') -and -not ($global:SnowStatuts -contains 'homo:erreur')) 'snow : chargement fige -> erreur sur la verification en attente'
+
+# Script jamais terminé (onglet figé) : resynchronisation au lieu d'un blocage.
+foreach ($ph in 'kick', 'poll') {
+    Reset-FakeSnow $ph $snowOk
+    $global:Snow.EnCours = @{ Type = 'homo'; Cle = 'X'; Url = '/u'; Essais = 0 }
+    $global:Snow.Task = [pscustomobject]@{ IsCompleted = $false; Result = $null }
+    $global:Snow.Deadline = (Get-Date).AddSeconds(-1)
+    Step-SnowPump
+    Assert ($global:Snow.Phase -eq 'init' -and $global:Snow.Pending.Contains('homo') -and $global:Snow.WebView.CoreWebView2.Navs.Count -eq 1) "snow : $ph sans reponse -> resynchronisation"
+}
+
+# Navigation en échec en arrière-plan (état ready) : erreur visible, plus d'attente muette.
+Reset-FakeSnow 'ready' $snowOk
+$global:Snow.Pending['homo'] = @{ Type = 'homo'; Cle = 'X'; Url = '/u'; Essais = 0 }
+Invoke-SnowNavigation ([pscustomobject]@{ IsSuccess = $false; WebErrorStatus = 'Disconnected' })
+Assert ($global:Snow.Phase -eq 'error' -and ($global:SnowStatuts -contains 'homo:erreur')) 'snow : echec reseau en arriere-plan -> erreur affichee'
+# … et une redirection remplacée (OperationCanceled) ne casse rien.
+Reset-FakeSnow 'sso' $snowOk
+Invoke-SnowNavigation ([pscustomobject]@{ IsSuccess = $false; WebErrorStatus = 'OperationCanceled' })
+Assert ($global:Snow.Phase -eq 'sso' -and $global:SnowStatuts.Count -eq 0) 'snow : navigation remplacee ignoree'
+
+# Demande pendant un chargement : statut « en attente » au lieu de « à venir » muet.
+Reset-FakeSnow 'init' $snowOk
+Submit-SnowRequete 'homo' 'X' '/u'
+Assert (($global:SnowStatuts -contains 'homo:info') -and $global:Snow.Pending.Contains('homo')) 'snow : demande pendant le chargement -> statut en attente'
+
+# Onglet planté : rechargement ; navigateur arrêté : page à recréer + erreur.
+Reset-FakeSnow 'ready' $snowOk
+Invoke-SnowProcessFailed 'RenderProcessExited'
+Assert ($global:Snow.Phase -eq 'init' -and $global:Snow.WebView.CoreWebView2.Navs.Count -eq 1) 'snow : onglet plante -> rechargement'
+Reset-FakeSnow 'poll' $snowOk
+$global:Snow.EnCours = @{ Type = 'doublon'; Cle = 'X'; Url = '/u'; Essais = 0 }
+Invoke-SnowProcessFailed 'BrowserProcessExited'
+Assert ($global:Snow.Phase -eq 'dead' -and $global:Snow.Pending.Contains('doublon') -and ($global:SnowStatuts -contains 'doublon:erreur')) 'snow : navigateur arrete -> page a recreer, erreur affichee'
+$global:Snow.Phase = 'off'; $global:Snow.WebView = $null; $global:Snow.Pending = [ordered]@{}; $global:Snow.OnStatut = @{}
+
 # --- Homonymes (helpers purs de lib/Homonymes.ps1) ---
 . (Join-Path $lib 'Homonymes.ps1')
 Assert ((ConvertTo-NomNormalise '  Jérémy   Pasturel ') -eq 'JEREMY PASTUREL') 'homo : normalisation accents/casse/espaces'

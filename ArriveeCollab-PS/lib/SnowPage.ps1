@@ -96,6 +96,34 @@ function Restore-SnowEnCours {
     $global:Snow.EnCours = $null
 }
 
+# Erreur affichée sur chaque vérification en attente (les autres gardent leur résultat).
+function Send-SnowErreurEnAttente {
+    param([string]$Texte)
+    foreach ($t in @($global:Snow.Pending.Keys)) { Send-SnowStatut 'erreur' $Texte $t }
+}
+
+# (Re)charge la page de départ. CoreWebView2.Navigate recharge TOUJOURS, même si la
+# page affiche déjà cette adresse : affecter .Source à l'URL courante ne fait rien
+# (le contrôle WinForms ignore une adresse identique), le moteur restait alors bloqué
+# en « init » pour toujours (vérifications figées sur « Vérification à venir… »).
+function Start-SnowChargement {
+    param([string]$Motif = '')
+    $h = $global:Snow
+    Restore-SnowEnCours
+    $h.Phase = 'init'
+    $h.Deadline = (Get-Date).AddSeconds(30)
+    if ($Motif) { Write-AppLog "[SNOW] Rechargement de la page : $Motif." }
+    try {
+        if ($h.WebView.CoreWebView2) { $h.WebView.CoreWebView2.Navigate($h.StartUrl) }
+        else { $h.WebView.Source = [uri]$h.StartUrl }
+    } catch {
+        # WebView2 hors service (processus navigateur arrêté) : page recréée à la prochaine demande.
+        Write-AppLog "[SNOW] Rechargement impossible : $($_.Exception.Message)"
+        $h.Phase = 'dead'
+        Send-SnowErreurEnAttente 'Vérification interrompue (cliquer pour relancer)'
+    }
+}
+
 # Échec d'une requête : resynchronisation SSO (rechargement de la page) et nouvel
 # essai automatique, au plus 2 fois ; au-delà, l'erreur est affichée.
 function Invoke-SnowResync {
@@ -106,11 +134,11 @@ function Invoke-SnowResync {
     if (-not $req) { $h.Phase = 'ready'; return }
     if ([int]$req.Essais -lt 2) {
         $req.Essais = [int]$req.Essais + 1
+        $req.NonPrete = 0
         if (-not $h.Pending.Contains($req.Type)) { $h.Pending[$req.Type] = $req }
         Write-AppLog "[SNOW] $($req.Type) : $Motif -> resynchronisation SSO (essai $($req.Essais + 1))."
         Send-SnowStatut 'info' 'Resynchronisation SSO avec ServiceNow…' $req.Type
-        $h.Phase = 'init'
-        $h.WebView.Source = [uri]$h.StartUrl
+        Start-SnowChargement
         return
     }
     $h.Phase = 'ready'
@@ -160,6 +188,14 @@ function Initialize-SnowEngine {
     param([string]$LibDir, [string]$DataDir, [string]$Type, [scriptblock]$OnResultat, [scriptblock]$OnStatut)
     $global:Snow.OnResultat[$Type] = $OnResultat
     $global:Snow.OnStatut[$Type] = $OnStatut
+    if ($global:Snow.Phase -eq 'dead') {
+        # Processus WebView2 arrêté : on jette l'ancienne page et on en recrée une.
+        Write-AppLog '[SNOW] Page cachée hors service : recréation.'
+        try { if ($global:Snow.Timer) { $global:Snow.Timer.Stop(); $global:Snow.Timer.Dispose() } } catch { }
+        try { if ($global:Snow.Form) { $global:Snow.Form.Dispose() } } catch { }
+        $global:Snow.Timer = $null; $global:Snow.Form = $null; $global:Snow.WebView = $null; $global:Snow.Task = $null
+        $global:Snow.Phase = 'off'
+    }
     if ($global:Snow.Phase -ne 'off') { return }
     # Test hors réseau SNCF (poste de dev sans VPN) : ARRIVEE_COLLAB_HOMO_FAKE et/ou
     # ARRIVEE_COLLAB_DOUBLON_FAKE = chemin d'un JSON { "records": [...] } renvoyé à la
@@ -231,6 +267,9 @@ function Initialize-SnowEngine {
             # Une demande d'identifiants « Basic » resterait bloquée dans une fenêtre
             # cachée (requête sans fin) : refusée, la requête échoue proprement.
             $c.add_BasicAuthenticationRequested({ param($cs, $ne) $ne.Cancel = $true; Write-AppLog '[SNOW] Authentification Basic demandée par le serveur : refusée.' })
+            # Onglet planté ou figé (fréquent après une longue inactivité) : sans ce
+            # gestionnaire, la requête en cours n'aboutissait jamais.
+            $c.add_ProcessFailed({ param($cs, $ne) try { Invoke-SnowProcessFailed ([string]$ne.ProcessFailedKind) } catch { Write-AppLog "[SNOW] ProcessFailed KO : $($_.Exception.Message)" } })
         } catch { Write-AppLog "[SNOW] Réglages WebView2 KO : $($_.Exception.Message)" }
     })
     $wv.Add_NavigationCompleted({ param($s, $e) try { Invoke-SnowNavigation $e } catch { Write-AppLog "[SNOW] Navigation KO : $($_.Exception.Message)" } })
@@ -247,8 +286,27 @@ function Initialize-SnowEngine {
 
     $f.Show()   # un WebView2 jamais affiché ne charge pas (fenêtre hors écran, sans focus)
     Send-SnowStatut 'info' 'Connexion à ServiceNow…'
+    $global:Snow.Deadline = (Get-Date).AddSeconds(45)   # 1er démarrage du runtime : plus lent
     $wv.Source = [uri]$global:Snow.StartUrl
     Write-AppLog '[SNOW] Page cachée initialisée.'
+}
+
+# Processus WebView2 en échec. Onglet planté / figé => rechargement ; navigateur
+# arrêté => page recréée à la prochaine demande. Les autres processus (GPU,
+# utilitaires, iframes) sont relancés par WebView2 lui-même.
+function Invoke-SnowProcessFailed {
+    param([string]$Kind)
+    Write-AppLog "[SNOW] Processus WebView2 en échec : $Kind"
+    switch ($Kind) {
+        'BrowserProcessExited' {
+            Restore-SnowEnCours
+            $global:Snow.Phase = 'dead'
+            Send-SnowErreurEnAttente 'Vérification interrompue (cliquer pour relancer)'
+        }
+        { $_ -in @('RenderProcessExited', 'RenderProcessUnresponsive') } {
+            Start-SnowChargement "onglet $Kind"
+        }
+    }
 }
 
 # Page chargée : soit on est sur l'instance (stabilisation puis prêt), soit sur une
@@ -257,10 +315,21 @@ function Invoke-SnowNavigation {
     param($e)
     $url = [string]$global:Snow.WebView.Source
     if (-not $e.IsSuccess) {
-        Write-AppLog "[SNOW] Navigation en échec ($($e.WebErrorStatus)) : $(([uri]$url).Host)"
+        $statut = [string]$e.WebErrorStatus
+        Write-AppLog "[SNOW] Navigation en échec ($statut) : $(([uri]$url).Host)"
+        # Navigation remplacée par une autre (redirection SSO) ou bloquée par notre
+        # filtre : la suivante décidera (et l'état « ready » vérifie l'hôte de la page).
+        if ($statut -eq 'OperationCanceled') { return }
         if ($global:Snow.Phase -in @('init', 'sso', 'auth', 'settle')) {
             $global:Snow.Phase = 'error'
             Send-SnowStatut 'erreur' 'ServiceNow injoignable (réseau / VPN ?)'
+        } elseif ($global:Snow.Phase -in @('ready', 'kick', 'poll')) {
+            # Échec en arrière-plan (session expirée après une longue inactivité puis
+            # réseau/VPN coupé…) : avant, l'état restait « ready » sur une page morte et
+            # les demandes suivantes attendaient indéfiniment, sans aucun message.
+            Restore-SnowEnCours
+            $global:Snow.Phase = 'error'
+            Send-SnowErreurEnAttente 'ServiceNow injoignable (cliquer pour relancer)'
         }
         return
     }
@@ -307,9 +376,12 @@ function Submit-SnowRequete {
     $global:Snow.Pending[$Type] = $req
     if ($global:Snow.Phase -eq 'error' -and $global:Snow.WebView) {
         # Nouvelle tentative après une erreur (réseau, connexion annulée) : on recharge.
-        $global:Snow.Phase = 'init'
         Send-SnowStatut 'info' 'Connexion à ServiceNow…' $Type
-        $global:Snow.WebView.Source = [uri]$global:Snow.StartUrl
+        Start-SnowChargement 'nouvelle demande après une erreur'
+    } elseif ($global:Snow.Phase -in @('init', 'sso', 'settle', 'kick', 'poll')) {
+        # La page n'est pas encore disponible : on le dit (au lieu de laisser
+        # « Vérification à venir… » sans rien d'autre).
+        Send-SnowStatut 'info' 'En attente de ServiceNow…' $Type
     }
 }
 
@@ -347,6 +419,14 @@ function Get-SnowKickJs {
 function Step-SnowPump {
     $h = $global:Snow
     switch ($h.Phase) {
+        'init' {
+            # Chargement resté sans réponse : erreur affichée (un clic relance).
+            if ((Get-Date) -gt $h.Deadline) {
+                Write-AppLog '[SNOW] Chargement de la page sans réponse.'
+                $h.Phase = 'error'
+                Send-SnowErreurEnAttente 'ServiceNow ne répond pas (cliquer pour relancer)'
+            }
+        }
         'sso' {
             # SSO silencieux bloqué (session Windows non reconnue par l'IdP) : dernier recours.
             if ((Get-Date) -gt $h.Deadline) { Show-SnowAuth }
@@ -356,8 +436,13 @@ function Step-SnowPump {
         }
         'ready' {
             if ($h.Pending.Count -eq 0) { return }
-            # Sécurité : n'exécuter un script que sur l'instance elle-même.
-            if (([uri][string]$h.WebView.Source).Host -ne $script:SnowInstanceHost) { return }
+            # Sécurité : n'exécuter un script que sur l'instance elle-même. Page partie
+            # ailleurs (session expirée pendant l'inactivité) : on la recharge — avant,
+            # on attendait ici indéfiniment.
+            if (([uri][string]$h.WebView.Source).Host -ne $script:SnowInstanceHost) {
+                Start-SnowChargement 'page sortie de ServiceNow'
+                return
+            }
             $type = @($h.Pending.Keys)[0]
             $req = $h.Pending[$type]
             $h.Pending.Remove($type)
@@ -368,9 +453,15 @@ function Step-SnowPump {
             $h.Phase = 'kick'
         }
         'kick' {
-            if (-not $h.Task.IsCompleted) { return }
+            if (-not $h.Task.IsCompleted) {
+                if ((Get-Date) -gt $h.Deadline) { Invoke-SnowResync 'script sans réponse' }
+                return
+            }
             if ([string]$h.Task.Result -eq '"notready"') {
-                # Page pas encore complète : on réessaiera au prochain tour.
+                # Page pas encore complète : on réessaiera au prochain tour (~15 s max,
+                # au-delà la page est rechargée).
+                $h.EnCours.NonPrete = [int]$h.EnCours.NonPrete + 1
+                if ([int]$h.EnCours.NonPrete -gt 60) { Invoke-SnowResync 'page jamais complètement chargée'; return }
                 Restore-SnowEnCours
                 $h.Phase = 'ready'
                 return
@@ -379,7 +470,10 @@ function Step-SnowPump {
             $h.Phase = 'poll'
         }
         'poll' {
-            if (-not $h.Task.IsCompleted) { return }
+            if (-not $h.Task.IsCompleted) {
+                if ((Get-Date) -gt $h.Deadline) { Invoke-SnowResync 'script sans réponse' }
+                return
+            }
             $req = $h.EnCours
             $res = [string]$h.Task.Result
             if ($res -eq '"PENDING"') {

@@ -1,11 +1,11 @@
 ﻿{
-    "version":  "1.15.1",
-    "zip":  "Arrivee-Collab_version1.15.1.zip",
-    "sha256":  "7BD92DB986AA661B5743B79DAC05E0D6C17DF64EB53299ABC526B546939044BC",
-    "sig":  "Y6Hp5tgZwzsTGHO2Q8j3RF1aoXmAJWjudSZ/5vd9L8bbUXkX9Xw0p66nTGSK9xPLVn+bVXaDm4ZAvIQczbfxV8qQQlqzBc1sCcDGYSQPY00wFWxRc+vXlp4GU5/Ll9aqCZwK3hMgRYB1K4X72M0nmCz6XrDHA5soA2OAvXWJRkH+GVZjUM1f8qZ3BMPvIkyvlNANux0HsfnmOVP0Vm+5+gM3pnwTXnWWkQ/TGH0qJ3aC45bfysGVakHvY96orOnsLRbkAO8ei045bSGIQNYANEh2G0WoFF8Cr84Apg/Iqtzp//yjYYSmnsX63XC312waqGnBp+zt5Xsy/oXHkGJpyejyKasntBWngFLmlpuNeMExVtrqScf17Eu+zNPqBtolpBY9NYWj+gin047QkeKH/r/0ZWuKOv6RVfSqlHJCHZeozqVNrJUTmYTsezOIPosLs2u2LJEtCQ32jAANVgeM6GxmR/KW5sPeGBia8BlnZPMWtt3izpqnbOCI/MxjjM/K",
-    "msig":  "pPizNH0ii4jFGNhmP2Qc+L2ZxbQWT0GnjzSXu4FL14gtLp14llEBx5PPqSPzjZ9swllLjyp/mcBaHje7RsH4yVxp7uealsRp6sTsv5c7nQF3ef2RdPC380p9p5Un0/Goj/iS5bw+iZHvF+ZRjn5toEg3UAIjue3//AC0e5avpbSkcgFIm0hnYC/JRGYBF9hPv0eoWR2i3wW3oG5KoUerV4cyqndtlsm41IndAOZtYAMtHZ+rZiW0IdiZWkxMTfRrk9vV0Nbx10n5vGV5NxoCj0ljiOnsIBddNOKv/f51d/vxx/fhlBEFSWc5QNWGMcmy7y2kX9+grRQEcGTn+lfEa9NiPwdLVqJns2rBb1B2yzjeNnCnwOa3bDn8HrT7daovpc+V2lcDdTxRkAemt14RyBZUHv2dICiO9eoI8FDYM+SCVRmjEdhSRgN277vTv0GXI3G+bcbu8GjfMLcEaKzVtvGeACZQKx7ZR9lle8vntKwRsMiJEP++0oRaDlagY9XB",
+    "version":  "1.15.2",
+    "zip":  "Arrivee-Collab_version1.15.2.zip",
+    "sha256":  "779CE2692F51B0CD63B99A27520B39CA0B21E9D8E8C9889D9EB13ECB3ACC94BC",
+    "sig":  "EMKZxfhHCtjvAtyuByhSmlexRwtfcOol+eCHfrhyvNL9gu5WjUocAdbMHLn8bim3Wn5z1e5Q9KvOnRjg47TTEhHSWhBvpXpsZxEj7b107/Vi7a3BGgXaC1hJhA+RkNXhbvjfxHmD9IjGcWde/D2PHrkD7NhVKCiO4Yxd8N2R0wQjjyEmRFmWJ231jjuCmGiO5rYvvyMtyfOQcf+JOMEB8pyXwd2ImaZBZq9gh/WOYjHqlNuI2sOK8ptOy1eX5zY2C6rVWLQGP9mxH9gkhsN7wJiW6w37IRavvfG1n0DIcTmIS1gh7L3M/yy3w+s3ABXRu7ICZv0wQdKsPUlR4HubjFxR+rq5PmhsejBnUMSCt6yGyyogsRvP7Q4TmXLLonpXvVrrqhppRbzaETBEds4lOm8BLm8c+4BNGx/RPyOCiaajTca7cEhfX7bFmLkWmY6h6DPt/tsHW/KA+M1LXpoQpwqgrHnnWS/F4/A4u9cX2pP7RdNTX+ygd/53Nj2KjA2o",
+    "msig":  "K+hieF7rwQBAm3DU23gW+R3kZ5ZsIEAwb90s4gDI158Kx/sRp6A43v6uBhoB3jfrmWxpRR6cov6sigtAJ5Aj2N88COXGPeEYmdBfKqWLsAPTsdHgPMxs8qlPLGgVtURBYeSkQK1g5RyVjNFxttIvYxW765jUTSpRghFeSRZ+0yllF7A+zjlDBKMXnrtI7Bce8GBR38tyYzJTQRAp0pcpS1p+ccnDoh2RXgDegOioeo6iI7QsGmJ3FOTjZMGS9TZMZtq0g0z6R0rApQ2AvWWYgwpR2qXjg7ASag2jd6vCLzPQq4QOY0vuJzXl6A1SsqAIpurpTmOb1ABmDp48QD2x+TlMN6ghCM5b+Bks62/ohjppIxpoEqPtlooGRpzAiEQ7+gU/wJtSaNy3zNbAj465xJS9AQAyM0ZZs3K67thA3XUD3JLNyY5/LlDLmOoqE9EyIr7LczV7kA/SXheXRbmhd9GzsTEgqzXK+OThH7R1nhAHMsRydg67hy2p/OR+B0KA",
     "date":  "2026-11-17",
     "notes":  [
-                  "Mot de passe déjà initialisé : la date affichée à côté du nombre de jours est désormais libellée « créé le … ». Il s\u0027agit de la date de création du mot de passe (celle reprise dans le mail et la note), et non de sa date d\u0027expiration."
+                  "Vérification des homonymes et des doublons : elle ne reste plus bloquée sur « Vérification à venir… » après un moment d\u0027inactivité. Si la connexion à ServiceNow a expiré ou ne répond plus, l\u0027outil la relance tout seul ; sinon un message s\u0027affiche et un clic suffit pour réessayer."
               ]
 }

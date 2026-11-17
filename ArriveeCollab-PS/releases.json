@@ -1,4 +1,7 @@
 ﻿{
+    "1.15.2": [
+        "Vérification des homonymes et des doublons : elle ne reste plus bloquée sur « Vérification à venir… » après un moment d'inactivité. Si la connexion à ServiceNow a expiré ou ne répond plus, l'outil la relance tout seul ; sinon un message s'affiche et un clic suffit pour réessayer."
+    ],
     "1.15.1": [
         "Mot de passe déjà initialisé : la date affichée à côté du nombre de jours est désormais libellée « créé le … ». Il s'agit de la date de création du mot de passe (celle reprise dans le mail et la note), et non de sa date d'expiration."
     ],
