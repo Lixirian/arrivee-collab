@@ -1,4 +1,7 @@
 ﻿{
+    "1.14.4": [
+        "Barre des tâches : quand l'outil se replie en bulle, son bouton ne clignote plus et un seul clic suffit pour ramener la fenêtre."
+    ],
     "1.14.3": [
         "Repliée en bulle, l'application reste visible dans la barre des tâches (sous son icône épinglée) : un clic dessus la ramène instantanément, comme un clic sur la bulle. Clic droit puis « Fermer la fenêtre » ferme l'outil."
     ],

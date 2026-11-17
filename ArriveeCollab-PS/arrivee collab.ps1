@@ -2811,7 +2811,9 @@ $slideTimer.Add_Tick({
             $global:BubbleShownAt = [DateTime]::Now
             $bubble.Show(); $bubble.BringToFront()
             $ghost.Hide()
-            $bubble.Activate()
+            # Pas de $bubble.Activate() : après un repli automatique (focus parti vers une
+            # autre app), Windows refuse le premier plan et fait CLIGNOTER le bouton de la
+            # bulle dans la barre des tâches, ce qui « avale » le clic suivant de l'utilisateur.
         } else {
             $form.Bounds = $global:AppFullBounds
             $form.Show()
