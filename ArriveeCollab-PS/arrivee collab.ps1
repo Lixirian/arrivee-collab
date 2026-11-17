@@ -1373,7 +1373,9 @@ $txtJoursInit.BorderStyle = 'FixedSingle'; $txtJoursInit.Font = [Drawing.Font]::
 $txtJoursInit.Visible = $false
 
 $lblJoursUnite = New-Object Windows.Forms.Label
-$lblJoursUnite.Text = "jours  ="
+# « créé le » : la date affichée est celle de CRÉATION du mot de passe (aujourd'hui
+# - (365 - X)), pas son expiration — l'ancien « jours = date » prêtait à confusion.
+$lblJoursUnite.Text = "jours  →  créé le"
 $lblJoursUnite.AutoSize = $true
 $lblJoursUnite.Location = New-Object Drawing.Point(($col2In + 68), 98)
 $lblJoursUnite.ForeColor = $cTextSecondary

@@ -1,4 +1,7 @@
 ﻿{
+    "1.15.1": [
+        "Mot de passe déjà initialisé : la date affichée à côté du nombre de jours est désormais libellée « créé le … ». Il s'agit de la date de création du mot de passe (celle reprise dans le mail et la note), et non de sa date d'expiration."
+    ],
     "1.15.0": [
         "Retour à une fenêtre classique : la bulle et le repli automatique sont supprimés. L'outil se réduit normalement dans la barre des tâches et un seul clic sur son icône le ramène.",
         "Relancer l'outil alors qu'il est déjà ouvert (icône épinglée, raccourci) ramène simplement la fenêtre existante : plus de seconde fenêtre, même en cliquant plusieurs fois rapidement."

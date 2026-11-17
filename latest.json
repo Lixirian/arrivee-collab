@@ -1,12 +1,11 @@
 ﻿{
-    "version":  "1.15.0",
-    "zip":  "Arrivee-Collab_version1.15.0.zip",
-    "sha256":  "5FF8422F2AC5FF4464E12AFDBAED3C87FABFE3A9FBF87CB0F028779F8D40FD2A",
-    "sig":  "q0t5AOvoBIY5lIT9kaiwZ4JBGi/fZ4xTmer8wvuP7VTwrKGjNiJmrhKIJgK8GYzDQvlhS5+49cN9Ug9xqKgYdHUHFAjtY1Hdz7NlJlCJRdNMYqMMA5o8NOLlnUU0xULeMbSg0BKXmNRGwYDS1Pw0+VOi+sLI06r2yLihJ7eLOGanKzK3pbnjJhl4KdywES7CvR/9t+OGPz81Ogxdloq7FOzv53q4//+x5SP6OULIWDcRqu0d8aLaIGN4DIzZhJtxHvR0dTM6gXCGB5opPD9je72wtMtyklHJqGuMEe24MZ6ibzzOQCVh2uJ4Ht7S0q4OLmgQUyQxnD3y4TBqhQR1EA9kuFYVJwOqtEvMh1tuuhkpdirNHTaTQbrP2Cc6Zz5RFNUDITSGsNTJpK0+c78KhbjYbefKHKGPzFlk+4YLFFVaHUPzEMs4u3uk2PHysLYon1JQDoq7qSgGNpzN1ZddtGAQnzP8fvBwh/PM8IoLtwjw5iy0LzQRQo7AcoryQom6",
-    "msig":  "hk0Czocp4RW/H5sp/SfKCz4D7cP0k9RyrkYhZsMQbz+/UUFKdWNhT4l1Prk7Iqeu7zGc2tx52xwypbiYCheNkPqdt2O1tG/OKkEVyRsCSClzNzYGMbGLpWKp63kcLCTbfI89z6FYWTXE2jufaOxgIJI9dGPDGpohmyYc3DvIf13GQRS+kR+9a3quVgJKNRPQf0ZCst6K24fbV2CVuoVRt6cbCNUzvufOXE2PjmiIOgF9SBAzfwBEwFP7nBf5lObg5y9OW7BVUM7VVBzSicQWc4wyml7zgXqEQjKX+ifpFRfVoIhySxTbX5ECV5+7RzDxReVQTSt0R0vZlgSOEsXXsF07xZZYgOtJA4IEXkVLyL1w4dL6xqeQNemo3HJX1dy0mKne/x3Zzr68VIC5strEKsz+WI5cqirhz4gLpArCM01fLkEIOqyyY7JkJEuBNn06K53L5sG4IYuafo+n3Zdvpj7I5ijuXZiiEFbMQD2u32YtREGfT/8XCjd1hp1V4+kj",
+    "version":  "1.15.1",
+    "zip":  "Arrivee-Collab_version1.15.1.zip",
+    "sha256":  "7BD92DB986AA661B5743B79DAC05E0D6C17DF64EB53299ABC526B546939044BC",
+    "sig":  "Y6Hp5tgZwzsTGHO2Q8j3RF1aoXmAJWjudSZ/5vd9L8bbUXkX9Xw0p66nTGSK9xPLVn+bVXaDm4ZAvIQczbfxV8qQQlqzBc1sCcDGYSQPY00wFWxRc+vXlp4GU5/Ll9aqCZwK3hMgRYB1K4X72M0nmCz6XrDHA5soA2OAvXWJRkH+GVZjUM1f8qZ3BMPvIkyvlNANux0HsfnmOVP0Vm+5+gM3pnwTXnWWkQ/TGH0qJ3aC45bfysGVakHvY96orOnsLRbkAO8ei045bSGIQNYANEh2G0WoFF8Cr84Apg/Iqtzp//yjYYSmnsX63XC312waqGnBp+zt5Xsy/oXHkGJpyejyKasntBWngFLmlpuNeMExVtrqScf17Eu+zNPqBtolpBY9NYWj+gin047QkeKH/r/0ZWuKOv6RVfSqlHJCHZeozqVNrJUTmYTsezOIPosLs2u2LJEtCQ32jAANVgeM6GxmR/KW5sPeGBia8BlnZPMWtt3izpqnbOCI/MxjjM/K",
+    "msig":  "pPizNH0ii4jFGNhmP2Qc+L2ZxbQWT0GnjzSXu4FL14gtLp14llEBx5PPqSPzjZ9swllLjyp/mcBaHje7RsH4yVxp7uealsRp6sTsv5c7nQF3ef2RdPC380p9p5Un0/Goj/iS5bw+iZHvF+ZRjn5toEg3UAIjue3//AC0e5avpbSkcgFIm0hnYC/JRGYBF9hPv0eoWR2i3wW3oG5KoUerV4cyqndtlsm41IndAOZtYAMtHZ+rZiW0IdiZWkxMTfRrk9vV0Nbx10n5vGV5NxoCj0ljiOnsIBddNOKv/f51d/vxx/fhlBEFSWc5QNWGMcmy7y2kX9+grRQEcGTn+lfEa9NiPwdLVqJns2rBb1B2yzjeNnCnwOa3bDn8HrT7daovpc+V2lcDdTxRkAemt14RyBZUHv2dICiO9eoI8FDYM+SCVRmjEdhSRgN277vTv0GXI3G+bcbu8GjfMLcEaKzVtvGeACZQKx7ZR9lle8vntKwRsMiJEP++0oRaDlagY9XB",
     "date":  "2026-11-17",
     "notes":  [
-                  "Retour à une fenêtre classique : la bulle et le repli automatique sont supprimés. L\u0027outil se réduit normalement dans la barre des tâches et un seul clic sur son icône le ramène.",
-                  "Relancer l\u0027outil alors qu\u0027il est déjà ouvert (icône épinglée, raccourci) ramène simplement la fenêtre existante : plus de seconde fenêtre, même en cliquant plusieurs fois rapidement."
+                  "Mot de passe déjà initialisé : la date affichée à côté du nombre de jours est désormais libellée « créé le … ». Il s\u0027agit de la date de création du mot de passe (celle reprise dans le mail et la note), et non de sa date d\u0027expiration."
               ]
 }
