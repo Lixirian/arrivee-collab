@@ -1,4 +1,7 @@
 ﻿{
+    "1.14.3": [
+        "Repliée en bulle, l'application reste visible dans la barre des tâches (sous son icône épinglée) : un clic dessus la ramène instantanément, comme un clic sur la bulle. Clic droit puis « Fermer la fenêtre » ferme l'outil."
+    ],
     "1.14.2": [
         "Relancer l'outil alors qu'il est déjà ouvert (icône épinglée, raccourci du Bureau ou du menu Démarrer) ramène désormais directement la fenêtre, même repliée en bulle ou réduite, au lieu d'afficher le message « déjà en cours d'exécution »."
     ],

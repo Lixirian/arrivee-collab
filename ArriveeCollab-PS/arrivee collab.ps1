@@ -124,6 +124,23 @@ public static class AcTaskbar {
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int cmd);
     // Fenêtre réduite (état Win32, que WinForms ne reflète pas toujours) : SW_RESTORE.
     public static void RestoreIfMinimized(IntPtr hwnd) { if (IsIconic(hwnd)) ShowWindow(hwnd, 9); }
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
+    [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int value);
+    // WS_MINIMIZEBOX sur une fenêtre sans bordure : sans ce style, un clic sur son bouton de
+    // barre des tâches alors qu'elle est active ne fait rien (pas de réduction à intercepter).
+    public static void AddMinimizeBox(IntPtr hwnd) { SetWindowLong(hwnd, -16, GetWindowLong(hwnd, -16) | 0x20000); }
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder s, int n);
+    // Le point (x, y) est-il sur une barre des tâches (principale ou écran secondaire) ?
+    public static bool IsTaskbarAt(int x, int y) {
+        POINT p; p.X = x; p.Y = y;
+        IntPtr root = GetAncestor(WindowFromPoint(p), 2);   // GA_ROOT
+        var sb = new System.Text.StringBuilder(64); GetClassName(root, sb, 64);
+        string c = sb.ToString();
+        return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd";
+    }
     static readonly Guid FMT = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");   // System.AppUserModel.*
     static void Set(IPropertyStore ps, uint pid, string val) {
         PROPERTYKEY k = new PROPERTYKEY(); k.fmtid = FMT; k.pid = pid;
@@ -2535,7 +2552,12 @@ $btnHide.BringToFront()
 # Bulle RONDE flottante (style « bulle de discussion ») avec l'icône de l'app. Cachée
 # par défaut ; n'apparaît qu'une fois l'app masquée.
 $bubble = New-Object Windows.Forms.Form
-$bubble.FormBorderStyle = 'None'; $bubble.ShowInTaskbar = $false
+# La bulle a son bouton dans la barre des tâches (même identifiant que la fenêtre, donc
+# regroupé sous l'icône épinglée) : repliée, l'app reste « ouverte » pour Windows et un
+# clic sur ce bouton la ramène aussitôt, sans relancer quoi que ce soit.
+$bubble.FormBorderStyle = 'None'; $bubble.ShowInTaskbar = $true
+$bubble.Text = "Arrivée Collab"
+if ($form.Icon) { $bubble.Icon = $form.Icon }
 $bubble.StartPosition = 'Manual'; $bubble.TopMost = $true
 # Windows impose une largeur mini de fenêtre (~136 px) : sans lever cette contrainte,
 # la bulle resterait large de 136 px (cercle clippé à gauche => bulle « décalée »).
@@ -2563,6 +2585,51 @@ try {
     } elseif ($picHeader.Image) { $picBubble.Image = $picHeader.Image }
 } catch { if ($picHeader.Image) { $picBubble.Image = $picHeader.Image } }
 $bubble.Controls.Add($picBubble)
+
+# --- Bouton de la bulle dans la barre des tâches ---
+# Activation de la bulle par la barre des tâches (ou Alt+Tab) => on ramène l'app. On
+# ignore : l'activation qui suit l'apparition de la bulle (Hide-App l'active lui-même),
+# et un clic souris SUR la bulle (géré par MouseUp : tap = afficher, glisser = déplacer).
+$global:BubbleShownAt = [DateTime]::MinValue
+$global:AppClosing = $false
+$bubble.Add_HandleCreated({
+    try {
+        [AcTaskbar]::AddMinimizeBox($bubble.Handle)
+        $cmd = Get-AppRelaunchCommand -AppRoot $baseDir -DataDir $dataDir
+        if ($cmd) {
+            $ico = if (Test-Path -LiteralPath $iconPath) { "$iconPath,0" } else { '' }
+            [AcTaskbar]::Apply($bubble.Handle, 'SNCF.ArriveeCollaborateur', $cmd, 'Arrivée Collab', $ico)
+        }
+    } catch { Write-AppLog "[UI] Bulle / barre des tâches : échec ($($_.Exception.Message))" }
+})
+$bubble.Add_Activated({
+    if (-not $global:AppHidden -or $slideTimer.Enabled) { return }
+    if ([Windows.Forms.Control]::MouseButtons -ne [Windows.Forms.MouseButtons]::None) { return }
+    if (([DateTime]::Now - $global:BubbleShownAt).TotalMilliseconds -lt 600) { return }
+    # Windows réactive parfois la bulle de lui-même (fenêtre fermée, repli…) : on ne
+    # réagit qu'à un clic sur la barre des tâches (curseur dessus) ou à Alt+Tab.
+    $cur = [Windows.Forms.Cursor]::Position
+    $alt = ([Windows.Forms.Control]::ModifierKeys -band [Windows.Forms.Keys]::Alt) -ne 0
+    if (-not $alt -and -not [AcTaskbar]::IsTaskbarAt($cur.X, $cur.Y)) { return }
+    Show-App
+})
+# WinForms recalcule le style à chaque affichage : on y remet WS_MINIMIZEBOX.
+$bubble.Add_VisibleChanged({ if ($bubble.Visible) { try { [AcTaskbar]::AddMinimizeBox($bubble.Handle) } catch { } } })
+# Clic sur le bouton alors que la bulle est déjà active : Windows la réduit => on annule
+# la réduction (position réelle requise par l'animation) puis on ramène l'app.
+$bubble.Add_Resize({
+    if ($bubble.WindowState -ne [Windows.Forms.FormWindowState]::Minimized) { return }
+    $bubble.WindowState = [Windows.Forms.FormWindowState]::Normal
+    if ($global:AppHidden -and -not $slideTimer.Enabled) { Show-App }
+})
+# « Fermer la fenêtre » depuis la barre des tâches : ferme l'app proprement (jamais la
+# bulle seule, qui laisserait l'app cachée sans moyen de la rappeler).
+$bubble.Add_FormClosing({
+    param($s, $e)
+    if ($global:AppClosing) { return }
+    $e.Cancel = $true
+    $global:AppHidden = $false; $bubble.Hide(); $form.Close()
+})
 
 # --- Déplacement de la bulle à la souris (comme les bulles de discussion Messenger) ---
 # On distingue un simple clic (=> afficher l'app) d'un glisser (=> repositionner la bulle).
@@ -2741,6 +2808,7 @@ $slideTimer.Add_Tick({
             $bubble.Location = $global:BubbleNextPos
             $global:BubbleLastPos = $global:BubbleNextPos
             $bubble.TopMost = $true
+            $global:BubbleShownAt = [DateTime]::Now
             $bubble.Show(); $bubble.BringToFront()
             $ghost.Hide()
             $bubble.Activate()
@@ -2777,7 +2845,8 @@ function Hide-App {
         # Repli si la capture a échoué : masquage direct sans animation.
         $global:AppHidden = $true; $form.Hide()
         $bubble.Location = $pos; $global:BubbleLastPos = $pos
-        $bubble.TopMost = $true; $bubble.Show(); $bubble.BringToFront(); return
+        $bubble.TopMost = $true; $global:BubbleShownAt = [DateTime]::Now
+        $bubble.Show(); $bubble.BringToFront(); return
     }
     $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
     $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
@@ -2822,7 +2891,7 @@ function Invoke-AppShowRequest {
     $form.Activate()
 }
 $showRequestTimer = New-Object Windows.Forms.Timer
-$showRequestTimer.Interval = 300
+$showRequestTimer.Interval = 100
 $showRequestTimer.Add_Tick({
     try {
         if ($global:AppShowEvent.WaitOne(0)) {
@@ -2903,7 +2972,7 @@ $miAutoHideBub = $bubbleMenu.Items.Add("Réduction automatique en bulle")
 $miAutoHideBub.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
 $bubbleMenu.add_Opening({ $miAutoHideBub.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
 
-$form.Add_FormClosed({ try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
+$form.Add_FormClosed({ $global:AppClosing = $true; try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
 # Fermeture : libère le WebView2 caché (et ses processus msedgewebview2).
 # Dispose() plutôt que Close() : Close passerait par FormClosing qui re-cache la fenêtre.
 $form.Add_FormClosed({
