@@ -7,7 +7,22 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 #  verrou, relancer le lanceur empilerait des instances et donc des bulles.)
 $global:AppCreatedNew = $false
 $global:AppMutex = New-Object System.Threading.Mutex($true, 'ArriveeCollaborateur_SingleInstance', [ref]$global:AppCreatedNew)
+# Demande « ramène la fenêtre » entre instances (icône épinglée, raccourci, .cmd) : la
+# 1re instance crée l'événement nommé et l'écoute ; une relance le signale puis s'arrête.
+$evCreated = $false
+$global:AppShowEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'ArriveeCollaborateur_ShowRequest', [ref]$evCreated)
 if (-not $global:AppCreatedNew) {
+    if (-not $evCreated) {
+        # Instance ouverte à l'écoute (>= 1.14.2) : on l'autorise à passer au premier plan
+        # (verrou de premier plan Windows) puis on lui demande de se réafficher, sans message.
+        try {
+            Add-Type -Namespace '' -Name 'AcFg' -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool AllowSetForegroundWindow(int pid);'
+            [void][AcFg]::AllowSetForegroundWindow(-1)
+        } catch { }
+        [void]$global:AppShowEvent.Set()
+        exit
+    }
+    # Instance ouverte d'une version antérieure (n'écoute pas) : ancien message.
     [System.Windows.Forms.MessageBox]::Show(
         "L'outil « Arrivée Collaborateur » est déjà en cours d'exécution.`r`n`r`nSi la fenêtre n'est pas visible, cliquez sur la bulle située sur le bord droit de votre écran principal pour la ramener.",
         "Arrivée Collaborateur",
@@ -105,6 +120,10 @@ public static class AcTaskbar {
     }
     [DllImport("shell32.dll")] static extern int SHGetPropertyStoreForWindow(IntPtr hwnd, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IPropertyStore ps);
     [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT pv);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int cmd);
+    // Fenêtre réduite (état Win32, que WinForms ne reflète pas toujours) : SW_RESTORE.
+    public static void RestoreIfMinimized(IntPtr hwnd) { if (IsIconic(hwnd)) ShowWindow(hwnd, 9); }
     static readonly Guid FMT = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");   // System.AppUserModel.*
     static void Set(IPropertyStore ps, uint pid, string val) {
         PROPERTYKEY k = new PROPERTYKEY(); k.fmtid = FMT; k.pid = pid;
@@ -2727,7 +2746,10 @@ $slideTimer.Add_Tick({
             $bubble.Activate()
         } else {
             $form.Bounds = $global:AppFullBounds
-            $form.Show(); $form.Activate()
+            $form.Show()
+            # Une app réduite (barre des tâches) se replie aussi en bulle : on la rétablit.
+            try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
+            $form.Activate()
             $global:AppHidden = $false
             $ghost.Hide()
         }
@@ -2773,7 +2795,8 @@ function Show-App {
     if ($null -eq $global:GhostSrc -or $null -eq $global:AppFullBounds) {
         # Repli : affichage direct.
         $bubble.Hide(); if ($global:AppFullBounds) { $form.Bounds = $global:AppFullBounds }
-        $form.Show(); $form.Activate(); $global:AppHidden = $false; return
+        $form.Show(); try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
+        $form.Activate(); $global:AppHidden = $false; return
     }
     $fb = $global:AppFullBounds
     $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
@@ -2789,6 +2812,26 @@ function Show-App {
 }
 
 $btnHide.Add_Click({ Hide-App })
+
+# Relance pendant que l'app tourne (clic sur l'icône épinglée, le raccourci…) : la
+# nouvelle instance signale l'événement et s'arrête ; ici on ramène la fenêtre (sortie
+# de bulle animée, ou restauration si réduite / derrière d'autres fenêtres).
+function Invoke-AppShowRequest {
+    if ($global:AppHidden) { Show-App; return }
+    $form.Show(); try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
+    $form.Activate()
+}
+$showRequestTimer = New-Object Windows.Forms.Timer
+$showRequestTimer.Interval = 300
+$showRequestTimer.Add_Tick({
+    try {
+        if ($global:AppShowEvent.WaitOne(0)) {
+            Write-AppLog "[UI] Relance détectée : fenêtre ramenée"
+            Invoke-AppShowRequest
+        }
+    } catch { Write-AppLog "[UI] Relance : échec ($($_.Exception.Message))" }
+})
+$showRequestTimer.Start()
 
 # ============================================================================
 #  Masquage AUTOMATIQUE : quand l'app perd le focus vers une AUTRE application,

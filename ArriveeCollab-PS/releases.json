@@ -1,4 +1,7 @@
 ﻿{
+    "1.14.2": [
+        "Relancer l'outil alors qu'il est déjà ouvert (icône épinglée, raccourci du Bureau ou du menu Démarrer) ramène désormais directement la fenêtre, même repliée en bulle ou réduite, au lieu d'afficher le message « déjà en cours d'exécution »."
+    ],
     "1.14.1": [
         "Épinglage dans la barre des tâches corrigé : clic droit sur l'icône de l'outil ouvert puis « Épingler à la barre des tâches » garde désormais l'icône Arrivée Collab et relance bien l'outil (au lieu d'une fenêtre PowerShell vide)."
     ],

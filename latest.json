@@ -1,11 +1,11 @@
 ﻿{
-    "version":  "1.14.1",
-    "zip":  "Arrivee-Collab_version1.14.1.zip",
-    "sha256":  "4938B9708D9FF7842FC75BD8A42EBEC36094910E3A5D83C605A0929D56438E66",
-    "sig":  "TQKdopR2srKU2gkjeMGadJwSV3ooJCi1jYW7P1hu4aSwjA5SNnA+8VO+lwrstTpAAAzOK1sGdzCF37BfCXNpL3x1WvX0hbFniVOcIDzcNjSti/iwQP8vTy6KSFc587ZolzTyKEasfqtUZpQm/4bV74H+lsMq5k0RXvGiNJ1vbSuZzLn2vU5Ygxg+wlzs07PvtWObvLJ1MUcF/xDAkoBNDbZhlTWFxCdigosZlv7UdQIzOQQKPitAg8ZhUpPc9gWiqvgmaSQDiiuYSbRD5t0O7Bp5WOPLumfzNY2O1VJqweLhbgFs+FPzXq9jb/lmmGeKmQPkYsXtzGQNiJtu4cDNtqnM17KizmScRnpbzLeuaa/RBj1HrBnPK+w9mlaGyC8EhRBurB7IvicyKea9oOeQCpf4vmIaSAviEQm/ehwuEvxgV64DQRiR6zibOeZb9qlQUzVrlpnsu9Gzb2MwBV6YTKhOxwvBNiR0PB1YSdrPTpnqvVU9Vf7KqerG47roCNs5",
-    "msig":  "bi+h9qnc0TrEF9O0cvK0F41jsLsF0mIfHuCEU+lGaK8x9lRmJY6MdebtrSo2IknVHrQYSYFJAFgSnKuLEOIFDHIyjMyL4LXtKABVo11Fsu4qItBOher/llSUaS8oPDREJiX7adWUHkO0sEX06amWkXz7SJj9NYfiZA0VB7uc25YvmBQkLP10CJ1qIkNwnkFhKAIUalKY3HMPdRUfpkCYcyYtHJbSAKDmbwelA8BVSeee3CcXyStN38ttRd6AdcsSPcTJeAcKVtbQqwCblvBPwQEHjk0ttarhW4rgRrQUITzijNdesTHn37SHI/lOVK2O5fJ9D1qfbihD8/Q6ST7VprYK5PBs6jG3IF+MV/U8UcpUBzud82HfeJgMJ05PTkbN7qL55gC8iAJNt3Zr3Wr1EfywYm5FT+1VHvkq+KA34GaalTYi+tHFDrjXjPkWs5gflSebzdWF/ymgMQ1w9YHTdqdpVVZPnrpVe7AMW892qfZX4MwfDXVyYzMOfl5/XPG9",
+    "version":  "1.14.2",
+    "zip":  "Arrivee-Collab_version1.14.2.zip",
+    "sha256":  "7E16C10AF027DEAE31DD1343B281B86B724A8300ECDC9E5540BD1D9BD89DE610",
+    "sig":  "T4rki5Txu8YQgjqLjnnxASvN0NLFVL+VjMMU+GvoHK/mmTbj0F57snhyKPxEDb+wUoed399w8x+NhS8t6j5/gjT9SjhqXlduL4bK5hi+J632Wbgjw5mLK06mt/DXrycYQAC7jKLLL1Y7qhfUaBHYHVwdIlnayImJF9KIDYGrudfun1bIqOdXGgZ+9I+pInEtcgLGvH6LTAZyAuuZUrsXwlt8sE/RQngfavidxvDHiw5a8+wCPdyKeHVoBsY6r49PVq3MtB15e06Z1uLpvtc4zHprQjmPmMgoRI+J1TAR9NdYW/mktfCGf5e3se51MUr7G9xXI4HY8p69H9CvymXkDvBb01H7JRiYn047bV4xrN4gCTtI/G/jJAxdqABv1iEdWg7IssbLl9kC/qJjp6nuE17fq0J4tgFFIPRtDSIgw6QN6mfDCATg49qkKk03udlyOm1jzcxOVQMYFr6uPiDdQWzp7zETLRtSAERUEuH7molklqKJgt0eT3ezk2r+c3s/",
+    "msig":  "fV7u+kLIS953mkVgqK4pXb6g4T15oBDBVJYjSyntUk0EqvjbWPxFzOXEilhNa+nBynqCWa/MKVgPqta6Xx4LVqac4ecedoWYABs7crce7qntRH4TiW6vbQMOL6duUzN+xZVfAinRpnLIb41QvkBbgHruO3QJ+c0+cjZfEyP2VbHjoe2D2O0sRFl5rBwu6jFA/uR/69rumi+IDTlp8SgRMgBmF1cQdKDrVI7nIBbr576VjC8UEye4A5RSK3jjoTvfiqt/sb5/OIJFozMe7FhuMDHuTwJ3uBQx9ShWfoCWc+RRPcl2SEmrHqQ/ACtLQz2izz1XD8G1xoOODsXvFU7v5++/SN8irZvsmKNMEOxk9laTfuNPuaqeqTBbc60wZmM1iJWqvnTnLPvr3sMDVQYmfY8biHkYhVWeoep9d5O0knLvdnS4aepCw03BIevJI9YK3xfov1R5UaEN3FDd0qB+Kb47ViAiERoz2JeT2GfjtXmFOu6JIToMfyVQODX0ruZY",
     "date":  "2026-11-17",
     "notes":  [
-                  "Épinglage dans la barre des tâches corrigé : clic droit sur l\u0027icône de l\u0027outil ouvert puis « Épingler à la barre des tâches » garde désormais l\u0027icône Arrivée Collab et relance bien l\u0027outil (au lieu d\u0027une fenêtre PowerShell vide)."
+                  "Relancer l\u0027outil alors qu\u0027il est déjà ouvert (icône épinglée, raccourci du Bureau ou du menu Démarrer) ramène désormais directement la fenêtre, même repliée en bulle ou réduite, au lieu d\u0027afficher le message « déjà en cours d\u0027exécution »."
               ]
 }
