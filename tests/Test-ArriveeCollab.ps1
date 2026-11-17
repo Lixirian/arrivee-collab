@@ -309,7 +309,7 @@ try {
 # --- Tutoriel : étapes + décision d'affichage ---
 . (Join-Path $lib 'Tutorial.ps1')
 $steps = @(Get-TutorialSteps @{ })
-Assert (@($steps).Count -eq 16) 'tuto : 16 etapes'
+Assert (@($steps).Count -eq 14) 'tuto : 14 etapes'
 Assert (@($steps | Where-Object { -not $_.Title }).Count -eq 0) 'tuto : chaque etape a un titre'
 Assert (@($steps | Where-Object { -not $_.Text }).Count -eq 0)  'tuto : chaque etape a un texte'
 Assert (@($steps | Where-Object { -not $_.Icon }).Count -eq 0)  'tuto : chaque etape a une icone'
@@ -356,15 +356,6 @@ $cfgVer = [regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\Arr
 Assert ([version]$bsMin -le [version]$cfgVer) 'lanceur : version minimale <= version publiee'
 Assert (Test-Path -LiteralPath (Join-Path $PSScriptRoot '..\dist-launcher\Arrivee Collab.vbs')) 'lanceur : .vbs local present'
 
-# --- Should-AutoHide (décision de masquage auto) ---
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $true)  'autohide : autre processus => masquer'
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 1234 -OwnPid 1234) -eq $false) 'autohide : meme processus (dialogue/calendrier) => non'
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $true  -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : flux .msg supprime => non'
-Assert ((Should-AutoHide -AppHidden $true  -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : deja masquee => non'
-Assert ((Should-AutoHide -AppHidden $false -Animating $true  -Suppressed $false -ForegroundPid 4321 -OwnPid 1234) -eq $false) 'autohide : animation en cours => non'
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 0    -OwnPid 1234) -eq $false) 'autohide : pas de fenetre premier plan => non'
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $true)  -eq $false) 'autohide : option desactivee => non'
-Assert ((Should-AutoHide -AppHidden $false -Animating $false -Suppressed $false -ForegroundPid 4321 -OwnPid 1234 -Disabled $false) -eq $true)  'autohide : option active => masquer'
 
 Write-Host ""
 if ($script:fail -eq 0) { Write-Host "TOUS LES TESTS PASSENT" -ForegroundColor Green }

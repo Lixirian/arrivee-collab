@@ -1,4 +1,8 @@
 ﻿{
+    "1.15.0": [
+        "Retour à une fenêtre classique : la bulle et le repli automatique sont supprimés. L'outil se réduit normalement dans la barre des tâches et un seul clic sur son icône le ramène.",
+        "Relancer l'outil alors qu'il est déjà ouvert (icône épinglée, raccourci) ramène simplement la fenêtre existante : plus de seconde fenêtre, même en cliquant plusieurs fois rapidement."
+    ],
     "1.14.5": [
         "Barre des tâches : un seul clic sur l'icône (ou sur sa miniature) suffit désormais pour ramener l'outil replié en bulle."
     ],

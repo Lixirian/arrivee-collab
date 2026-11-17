@@ -2,9 +2,8 @@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# --- Instance unique : empêche d'ouvrir plusieurs fenêtres/bulles simultanées ---
-# (En mode masqué l'app n'a ni croix ni entrée dans la barre des tâches : sans ce
-#  verrou, relancer le lanceur empilerait des instances et donc des bulles.)
+# --- Instance unique : empêche d'ouvrir plusieurs fenêtres simultanées ---
+# (Une relance ne crée pas de 2e fenêtre : elle demande à la 1re de revenir.)
 $global:AppCreatedNew = $false
 $global:AppMutex = New-Object System.Threading.Mutex($true, 'ArriveeCollaborateur_SingleInstance', [ref]$global:AppCreatedNew)
 # Demande « ramène la fenêtre » entre instances (icône épinglée, raccourci, .cmd) : la
@@ -24,7 +23,7 @@ if (-not $global:AppCreatedNew) {
     }
     # Instance ouverte d'une version antérieure (n'écoute pas) : ancien message.
     [System.Windows.Forms.MessageBox]::Show(
-        "L'outil « Arrivée Collaborateur » est déjà en cours d'exécution.`r`n`r`nSi la fenêtre n'est pas visible, cliquez sur la bulle située sur le bord droit de votre écran principal pour la ramener.",
+        "L'outil « Arrivée Collaborateur » est déjà en cours d'exécution.`r`n`r`nUtilisez la fenêtre déjà ouverte (icône dans la barre des tâches).",
         "Arrivée Collaborateur",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
@@ -124,53 +123,6 @@ public static class AcTaskbar {
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int cmd);
     // Fenêtre réduite (état Win32, que WinForms ne reflète pas toujours) : SW_RESTORE.
     public static void RestoreIfMinimized(IntPtr hwnd) { if (IsIconic(hwnd)) ShowWindow(hwnd, 9); }
-    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
-    [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int value);
-    // WS_MINIMIZEBOX sur une fenêtre sans bordure : sans ce style, un clic sur son bouton de
-    // barre des tâches alors qu'elle est active ne fait rien (pas de réduction à intercepter).
-    public static void AddMinimizeBox(IntPtr hwnd) { SetWindowLong(hwnd, -16, GetWindowLong(hwnd, -16) | 0x20000); }
-    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
-    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
-    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder s, int n);
-    // Le point (x, y) est-il sur une barre des tâches (principale ou écran secondaire) ?
-    public static bool IsTaskbarAt(int x, int y) {
-        POINT p; p.X = x; p.Y = y;
-        IntPtr root = GetAncestor(WindowFromPoint(p), 2);   // GA_ROOT
-        var sb = new System.Text.StringBuilder(64); GetClassName(root, sb, 64);
-        string c = sb.ToString();
-        return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd";
-    }
-    // --- Origine d'une activation : dernière fenêtre au premier plan AVANT les nôtres ---
-    // Un clic sur le bouton de barre des tâches, sur sa MINIATURE (Windows 11) ou un
-    // Alt+Tab passe d'abord le premier plan à l'interface du shell (explorer.exe). Une
-    // réactivation spontanée par Windows vient, elle, d'une autre application.
-    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObj, int idChild, uint thread, uint time);
-    [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr hmod, WinEventProc proc, uint pid, uint tid, uint flags);
-    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
-    static WinEventProc _fgProc; static IntPtr _fgHook; static IntPtr _prevFg; static uint _ownPid;
-    public static void StartForegroundTracking() {
-        if (_fgHook != IntPtr.Zero) return;
-        _ownPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
-        _fgProc = (h, ev, hwnd, o, c, t, tm) => { uint pid; GetWindowThreadProcessId(hwnd, out pid); if (pid != _ownPid) _prevFg = hwnd; };
-        _fgHook = SetWinEventHook(3, 3, IntPtr.Zero, _fgProc, 0, 0, 0);   // EVENT_SYSTEM_FOREGROUND, hors contexte
-    }
-    static string RootClass(IntPtr hwnd) {
-        var sb = new System.Text.StringBuilder(128); GetClassName(GetAncestor(hwnd, 2), sb, 128); return sb.ToString();
-    }
-    // Fenêtre d'interface du shell (barre des tâches, miniatures, Alt+Tab…), hors Bureau
-    // et fenêtres de l'Explorateur de fichiers (aussi hébergés par explorer.exe).
-    public static bool IsShellUi(IntPtr hwnd) {
-        if (hwnd == IntPtr.Zero) return false;
-        string c = RootClass(hwnd);
-        if (c == "Progman" || c == "WorkerW" || c == "CabinetWClass" || c == "ExploreWClass") return false;
-        if (c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd") return true;
-        uint pid; GetWindowThreadProcessId(hwnd, out pid);
-        try { return System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase); }
-        catch { return false; }
-    }
-    public static bool ActivatedFromShell() { return IsShellUi(_prevFg); }
-    public static string PrevForegroundClass() { return _prevFg == IntPtr.Zero ? "" : RootClass(_prevFg); }
     static readonly Guid FMT = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");   // System.AppUserModel.*
     static void Set(IPropertyStore ps, uint pid, string val) {
         PROPERTYKEY k = new PROPERTYKEY(); k.fmtid = FMT; k.pid = pid;
@@ -1188,7 +1140,7 @@ $form.Add_Shown({
         [DarkTitleBar]::ApplyDarkScrollbar($rtbMsg.Handle)
     } catch {}
 })
-# Épinglage : propriétés posées dès la création du handle (Hide/Show du repli en bulle
+# Épinglage : propriétés posées dès la création du handle (Hide/Show
 # ne recrée pas le handle, elles restent donc valables toute la session).
 $form.Add_HandleCreated({
     try {
@@ -1261,7 +1213,7 @@ function Update-UpdateBadge {
     $action = {
         if ($Ctx.UpdateAvailable) {
             $b.Text = "  ⬆ Mise à jour $($Ctx.UpdateAvailable.Version)  "
-            $b.Left = $btnHide.Left - $b.Width - 10
+            $b.Left = $btnHelp.Left - $b.Width - 10
             $b.Visible = $true; $b.BringToFront()
         } else { $b.Visible = $false }
     }
@@ -1381,44 +1333,6 @@ if ((Test-Path $cheminHeader) -and (Test-Path $cheminSignature)) {
 } else {
     $lblStatusImg.Text = "Vérifier les images !"; $lblStatusImg.ForeColor = $cDanger
 }
-
-# Case à cocher VISIBLE de la préférence « réduction automatique en bulle » (la même
-# option que le clic droit sur « » » / sur la bulle, plus explicite). Cochée = l'app
-# se replie en bulle à la perte de focus ; décochée = elle reste affichée. Synchronisée
-# dans les deux sens avec les menus contextuels via Set-AutoHideDisabled.
-$chkAutoBulle = New-Object Windows.Forms.CheckBox
-$chkAutoBulle.Text = "  Réduction auto en bulle"
-$chkAutoBulle.Location = New-Object Drawing.Point(830, 100)
-$chkAutoBulle.Size = New-Object Drawing.Size(200, 28)
-$chkAutoBulle.ForeColor = $cTextPrimary
-$chkAutoBulle.BackColor = $cBgSecondary
-$chkAutoBulle.Font = [Drawing.Font]::new("Segoe UI", 9)
-$chkAutoBulle.FlatStyle = 'Flat'
-# Case lisible sur fond sombre : le rendu système (gris sur gris) est redessiné
-# par-dessus — contour violet décochée, remplie de violet avec coche blanche cochée.
-$chkAutoBulle.Add_Paint({
-    param($s, $e)
-    $g = $e.Graphics
-    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $t = 14; $y = [int](($s.ClientSize.Height - $t) / 2)
-    $g.FillRectangle((New-Object Drawing.SolidBrush($cBgSecondary)), -1, ($y - 2), ($t + 3), ($t + 4))
-    $box = New-Object Drawing.Rectangle(0, $y, $t, $t)
-    if ($s.Checked) {
-        $g.FillRectangle((New-Object Drawing.SolidBrush($cAccentViolet)), $box)
-        $pen = New-Object Drawing.Pen($cWhite, 2)
-        $g.DrawLines($pen, [Drawing.Point[]]@((New-Object Drawing.Point(3, ($y + 7))), (New-Object Drawing.Point(6, ($y + 10))), (New-Object Drawing.Point(11, ($y + 4)))))
-        $pen.Dispose()
-    } else {
-        $g.FillRectangle((New-Object Drawing.SolidBrush($cSurface)), $box)
-        $pen = New-Object Drawing.Pen($cAccentViolet, 1.5)
-        $g.DrawRectangle($pen, 0, $y, ($t - 1), ($t - 1))
-        $pen.Dispose()
-    }
-})
-$chkAutoBulle.Cursor = [Windows.Forms.Cursors]::Hand
-$chkAutoBulle.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
-$chkAutoBulle.Checked = -not [bool]$global:Ctx.State.AutoHideDisabled
-$chkAutoBulle.Add_CheckedChanged({ Set-AutoHideDisabled (-not $chkAutoBulle.Checked) })
 
 # Ligne 3 : Checkbox mot de passe déjà initialisé + décompte « il y a X jours »
 $chkMdpDejaInit = New-Object Windows.Forms.CheckBox
@@ -1542,7 +1456,7 @@ $txtJoursInit.Add_KeyDown({
 $txtJoursInit.Add_TextChanged({ Update-DateInitCalculee; Update-Preview })
 Update-DateInitCalculee
 
-$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$btnVerifHomo,$lblHomo,$btnVerifDoublon,$lblDoublon,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg,$chkAutoBulle))
+$panelForm.Controls.AddRange(@($lblRITM,$txtRITM,$lblEmail,$txtEmail,$lblNomPrenom,$txtNomPrenom,$btnVerifHomo,$lblHomo,$btnVerifDoublon,$lblDoublon,$chkMdpDejaInit,$lblDateInit,$txtJoursInit,$lblJoursUnite,$lblDateCalc,$picHeader,$picSignature,$lblStatusImg))
 
 # --- Layout responsive du panneau formulaire ---
 function Layout-FormPanel {
@@ -2377,7 +2291,6 @@ $btnGenMsg.Add_Click({
     # Pendant toute la génération (création du .msg, ouverture dans Outlook,
     # dialogues, saisie bénéficiaire), on suspend le masquage automatique :
     # l'utilisateur a encore des actions sur l'app après l'ouverture du message.
-    $global:SuppressAutoHide = $true
     try {
     $ritm = $txtRITM.Text.Trim(); $nomPrenom = $txtNomPrenom.Text.Trim(); $dest = $txtEmail.Text.Trim()
     if ($ritm -eq "" -or $nomPrenom -eq "" -or $dest -eq "") {
@@ -2511,7 +2424,6 @@ $btnGenMsg.Add_Click({
         }
     }
     } finally {
-        $global:SuppressAutoHide = $false
     }
 })
 
@@ -2544,387 +2456,11 @@ $form.Add_Shown({
 })
 
 # ============================================================================
-#  Masquage de l'app : un bouton « masquer » (en-tête) fait coulisser la fenêtre
-#  hors écran vers la droite, puis affiche une petite LANGUETTE au bord droit de
-#  l'écran de l'app. Clic sur la languette : l'app revient en glissant. La languette
-#  n'apparaît QUE pendant le masquage. Tout est recalculé au clic (correct multi-écran).
+#  Relance pendant que l'app tourne (clic sur l'icône épinglée, raccourci, .cmd…) :
+#  la nouvelle instance signale l'événement nommé et s'arrête aussitôt ; ici on
+#  ramène simplement la fenêtre (restaurée si réduite, puis mise au premier plan).
 # ============================================================================
-$global:AppHidden = $false
-# Drapeau : suspend le masquage automatique pendant le flux de génération du .msg.
-$global:SuppressAutoHide = $false
-# Préférence UTILISATEUR : ne pas replier en bulle à la perte de focus (la fenêtre
-# reste visible sur le côté). Basculable par clic droit sur « » » ou sur la bulle ;
-# persistée dans state.json. Le masquage MANUEL (clic sur « » ») reste possible.
-$global:AutoHideDisabled = [bool]$global:Ctx.State.AutoHideDisabled
-# Dernière position de la bulle ($null = jamais déplacée => position par défaut).
-$global:BubbleLastPos = $null
-# Position d'apparition résolue au masquage + bounds pleins de l'app (pour l'animation).
-$global:BubbleNextPos = $null
-$global:BubbleSide = 'Right'
-$global:AppFullBounds = $null
-# Capture de la fenêtre (image source du fantôme animé).
-$global:GhostSrc = $null
-
-# Bouton « masquer » dans l'en-tête (à gauche du bouton « ? »).
-$btnHide = New-Object Windows.Forms.Button
-$btnHide.Text = "»"
-$btnHide.Size = New-Object Drawing.Size(34, 34)
-$btnHide.Location = New-Object Drawing.Point(1002, 18)
-$btnHide.FlatStyle = 'Flat'; $btnHide.FlatAppearance.BorderSize = 0
-$btnHide.FlatAppearance.MouseOverBackColor = $cAccentVioletHover
-$btnHide.BackColor = $cBorder; $btnHide.ForeColor = $cWhite
-$btnHide.Font = [Drawing.Font]::new("Segoe UI", 12, [Drawing.FontStyle]::Bold)
-$btnHide.Cursor = [Windows.Forms.Cursors]::Hand
-$btnHide.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
-$form.Controls.Add($btnHide)
-$btnHide.BringToFront()
-
-# Bulle RONDE flottante (style « bulle de discussion ») avec l'icône de l'app. Cachée
-# par défaut ; n'apparaît qu'une fois l'app masquée.
-$bubble = New-Object Windows.Forms.Form
-# La bulle a son bouton dans la barre des tâches (même identifiant que la fenêtre, donc
-# regroupé sous l'icône épinglée) : repliée, l'app reste « ouverte » pour Windows et un
-# clic sur ce bouton la ramène aussitôt, sans relancer quoi que ce soit.
-$bubble.FormBorderStyle = 'None'; $bubble.ShowInTaskbar = $true
-$bubble.Text = "Arrivée Collab"
-if ($form.Icon) { $bubble.Icon = $form.Icon }
-$bubble.StartPosition = 'Manual'; $bubble.TopMost = $true
-# Windows impose une largeur mini de fenêtre (~136 px) : sans lever cette contrainte,
-# la bulle resterait large de 136 px (cercle clippé à gauche => bulle « décalée »).
-$bubble.MinimumSize = New-Object Drawing.Size(1, 1)
-$bubble.AutoScaleMode = 'None'
-$bubble.Size = New-Object Drawing.Size(54, 54)
-$bubble.BackColor = [Drawing.Color]::White
-$bpath = New-Object Drawing.Drawing2D.GraphicsPath
-$bpath.AddEllipse(0, 0, 54, 54)
-$bubble.Region = New-Object Drawing.Region($bpath)
-$bubble.Cursor = [Windows.Forms.Cursors]::Hand
-
-$picBubble = New-Object Windows.Forms.PictureBox
-$picBubble.Dock = 'Fill'; $picBubble.SizeMode = 'StretchImage'
-$picBubble.BackColor = [Drawing.Color]::White
-$picBubble.Cursor = [Windows.Forms.Cursors]::Hand
-# Avatar = SEULEMENT la TÊTE de la conseillère, recadrée depuis l'en-tête paysage
-# (qui contient aussi un robot et le buste). Rect calé sur le visage détecté (35,14,80,80).
-try {
-    if (Test-Path $cheminHeader) {
-        $srcAvatar = New-Object Drawing.Bitmap($cheminHeader)
-        $crop = New-Object Drawing.Rectangle(35, 14, 80, 80)
-        $picBubble.Image = $srcAvatar.Clone($crop, $srcAvatar.PixelFormat)
-        $srcAvatar.Dispose()
-    } elseif ($picHeader.Image) { $picBubble.Image = $picHeader.Image }
-} catch { if ($picHeader.Image) { $picBubble.Image = $picHeader.Image } }
-$bubble.Controls.Add($picBubble)
-
-# --- Bouton de la bulle dans la barre des tâches ---
-# Activation de la bulle par la barre des tâches (ou Alt+Tab) => on ramène l'app. On
-# ignore : l'activation qui suit l'apparition de la bulle (Hide-App l'active lui-même),
-# et un clic souris SUR la bulle (géré par MouseUp : tap = afficher, glisser = déplacer).
-$global:BubbleShownAt = [DateTime]::MinValue
-$global:AppClosing = $false
-try { [AcTaskbar]::StartForegroundTracking() } catch { Write-AppLog "[UI] Suivi du premier plan : échec ($($_.Exception.Message))" }
-$bubble.Add_HandleCreated({
-    try {
-        [AcTaskbar]::AddMinimizeBox($bubble.Handle)
-        $cmd = Get-AppRelaunchCommand -AppRoot $baseDir -DataDir $dataDir
-        if ($cmd) {
-            $ico = if (Test-Path -LiteralPath $iconPath) { "$iconPath,0" } else { '' }
-            [AcTaskbar]::Apply($bubble.Handle, 'SNCF.ArriveeCollaborateur', $cmd, 'Arrivée Collab', $ico)
-        }
-    } catch { Write-AppLog "[UI] Bulle / barre des tâches : échec ($($_.Exception.Message))" }
-})
-$bubble.Add_Activated({
-    if (-not $global:AppHidden -or $slideTimer.Enabled) { return }
-    if ([Windows.Forms.Control]::MouseButtons -ne [Windows.Forms.MouseButtons]::None) { return }
-    if (([DateTime]::Now - $global:BubbleShownAt).TotalMilliseconds -lt 600) { return }
-    # Windows réactive parfois la bulle de lui-même (fenêtre fermée, repli…) : on ne
-    # réagit qu'à une activation venue du shell (bouton ou MINIATURE de la barre des
-    # tâches, Alt+Tab), au curseur posé sur la barre des tâches, ou à Alt maintenu.
-    $cur = [Windows.Forms.Cursor]::Position
-    $alt = ([Windows.Forms.Control]::ModifierKeys -band [Windows.Forms.Keys]::Alt) -ne 0
-    $shell = $false; try { $shell = [AcTaskbar]::ActivatedFromShell() } catch { }
-    if (-not ($shell -or $alt -or [AcTaskbar]::IsTaskbarAt($cur.X, $cur.Y))) {
-        Write-AppLog ("[UI] Bulle activée sans clic barre des tâches (précédente : {0}) : ignoré" -f [AcTaskbar]::PrevForegroundClass())
-        return
-    }
-    Show-App
-})
-# WinForms recalcule le style à chaque affichage : on y remet WS_MINIMIZEBOX.
-$bubble.Add_VisibleChanged({ if ($bubble.Visible) { try { [AcTaskbar]::AddMinimizeBox($bubble.Handle) } catch { } } })
-# Clic sur le bouton alors que la bulle est déjà active : Windows la réduit => on annule
-# la réduction (position réelle requise par l'animation) puis on ramène l'app.
-$bubble.Add_Resize({
-    if ($bubble.WindowState -ne [Windows.Forms.FormWindowState]::Minimized) { return }
-    $bubble.WindowState = [Windows.Forms.FormWindowState]::Normal
-    if ($global:AppHidden -and -not $slideTimer.Enabled) { Show-App }
-})
-# « Fermer la fenêtre » depuis la barre des tâches : ferme l'app proprement (jamais la
-# bulle seule, qui laisserait l'app cachée sans moyen de la rappeler).
-$bubble.Add_FormClosing({
-    param($s, $e)
-    if ($global:AppClosing) { return }
-    $e.Cancel = $true
-    $global:AppHidden = $false; $bubble.Hide(); $form.Close()
-})
-
-# --- Déplacement de la bulle à la souris (comme les bulles de discussion Messenger) ---
-# On distingue un simple clic (=> afficher l'app) d'un glisser (=> repositionner la bulle).
-# Un glisser au-delà de 5 px verrouille le mode déplacement ; au relâchement la bulle
-# s'aimante au bord gauche/droit le plus proche de l'écran où elle se trouve.
-$dragState = @{ Dragging = $false; Moved = $false; OffX = 0; OffY = 0; DownX = 0; DownY = 0 }
-$picBubble.Add_MouseDown({
-    param($s, $e)
-    if ($e.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
-    $dragState.Dragging = $true
-    $dragState.Moved = $false
-    $dragState.OffX = $e.X
-    $dragState.OffY = $e.Y
-    $p = [Windows.Forms.Cursor]::Position
-    $dragState.DownX = $p.X; $dragState.DownY = $p.Y
-})
-$picBubble.Add_MouseMove({
-    param($s, $e)
-    if (-not $dragState.Dragging) { return }
-    $p = [Windows.Forms.Cursor]::Position
-    if (-not $dragState.Moved -and ([Math]::Abs($p.X - $dragState.DownX) -gt 5 -or [Math]::Abs($p.Y - $dragState.DownY) -gt 5)) {
-        $dragState.Moved = $true
-    }
-    $bubble.Location = New-Object Drawing.Point(($p.X - $dragState.OffX), ($p.Y - $dragState.OffY))
-})
-$picBubble.Add_MouseUp({
-    param($s, $e)
-    if ($e.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
-    if (-not $dragState.Dragging) { return }
-    $dragState.Dragging = $false
-    if ($dragState.Moved) {
-        # Aimantation au bord gauche/droit le plus proche de l'écran courant.
-        $cx = $bubble.Left + [int]($bubble.Width / 2)
-        $cy = $bubble.Top + [int]($bubble.Height / 2)
-        $wa = [Windows.Forms.Screen]::FromPoint((New-Object Drawing.Point($cx, $cy))).WorkingArea
-        $y = [Math]::Max($wa.Top, [Math]::Min($bubble.Top, $wa.Bottom - $bubble.Height))
-        if ($cx -lt ($wa.Left + $wa.Width / 2)) { $x = $wa.Left + 8; $global:BubbleSide = 'Left' } else { $x = $wa.Right - $bubble.Width - 8; $global:BubbleSide = 'Right' }
-        $bubble.Location = New-Object Drawing.Point([int]$x, [int]$y)
-        # Mémorise la position + le côté pour la prochaine animation et le prochain masquage.
-        $global:BubbleLastPos = $bubble.Location
-    } else {
-        Show-App
-    }
-})
-
-# ============================================================================
-#  Animation de masquage/affichage : au masquage, une IMAGE FANTÔME de l'app
-#  rétrécit en ligne droite vers la bulle en s'estompant ; à l'affichage, elle
-#  ré-émerge de la bulle et grandit jusqu'à sa position. Effet volontairement
-#  MINIMAL (zoom + fondu, sans rotation/spirale/flou : trop coûteux par frame,
-#  l'animation saccadait). Point focal = la bulle (pas le bord d'écran) =>
-#  robuste multi-écran ; le vrai formulaire n'est jamais redimensionné.
-#  Fenêtre à transparence PAR PIXEL (UpdateLayeredWindow).
-# ============================================================================
-# Fenêtre à transparence PAR PIXEL (alpha doux, pas de bord net) via UpdateLayeredWindow.
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
-using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-public static class LayeredGhost {
-    [DllImport("user32.dll", SetLastError=true)] static extern int GetWindowLong(IntPtr h, int i);
-    [DllImport("user32.dll", SetLastError=true)] static extern int SetWindowLong(IntPtr h, int i, int v);
-    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
-    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
-    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
-    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr o);
-    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
-    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
-    [DllImport("user32.dll", SetLastError=true)]
-    static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr dst, ref POINT pDst, ref SIZE size, IntPtr src, ref POINT pSrc, int key, ref BLENDFUNCTION bf, int flags);
-    [StructLayout(LayoutKind.Sequential)] struct POINT { public int x, y; public POINT(int a, int b){x=a;y=b;} }
-    [StructLayout(LayoutKind.Sequential)] struct SIZE { public int cx, cy; public SIZE(int a, int b){cx=a;cy=b;} }
-    [StructLayout(LayoutKind.Sequential, Pack=1)] struct BLENDFUNCTION { public byte Op, Flags, Alpha, Format; }
-    const int GWL_EXSTYLE=-20, WS_EX_LAYERED=0x80000, ULW_ALPHA=2;
-    public static void Enable(IntPtr hwnd) {
-        int ex = GetWindowLong(hwnd, GWL_EXSTYLE);
-        SetWindowLong(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
-    }
-    // NB : pas de prémultiplication alpha — les frames sont entièrement opaques
-    // (alpha par pixel = 255, où prémultiplié == direct) ; le fondu passe par
-    // BLENDFUNCTION.Alpha. Évite une boucle managée sur tous les pixels par frame.
-    public static void Update(IntPtr hwnd, Bitmap bmp, int x, int y, byte alpha) {
-        IntPtr screen = GetDC(IntPtr.Zero);
-        IntPtr mem = CreateCompatibleDC(screen);
-        IntPtr hb = IntPtr.Zero, old = IntPtr.Zero;
-        try {
-            hb = bmp.GetHbitmap(Color.FromArgb(0));
-            old = SelectObject(mem, hb);
-            SIZE sz = new SIZE(bmp.Width, bmp.Height);
-            POINT ps = new POINT(0,0); POINT pd = new POINT(x,y);
-            BLENDFUNCTION bf = new BLENDFUNCTION(); bf.Op=0; bf.Flags=0; bf.Alpha=alpha; bf.Format=1;
-            UpdateLayeredWindow(hwnd, screen, ref pd, ref sz, mem, ref ps, 0, ref bf, ULW_ALPHA);
-        } finally {
-            if (old != IntPtr.Zero) SelectObject(mem, old);
-            if (hb != IntPtr.Zero) DeleteObject(hb);
-            DeleteDC(mem); ReleaseDC(IntPtr.Zero, screen);
-        }
-    }
-}
-"@
-
-# P/Invoke : fenêtre au premier plan + son PID (pour le masquage automatique).
-Add-Type -Namespace Win32 -Name Fg -MemberDefinition @'
-[System.Runtime.InteropServices.DllImport("user32.dll")]
-public static extern System.IntPtr GetForegroundWindow();
-[System.Runtime.InteropServices.DllImport("user32.dll")]
-public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint lpdwProcessId);
-'@
-
-$ghost = New-Object Windows.Forms.Form
-$ghost.FormBorderStyle = 'None'; $ghost.ShowInTaskbar = $false
-$ghost.StartPosition = 'Manual'; $ghost.TopMost = $true
-$ghost.MinimumSize = New-Object Drawing.Size(1, 1)
-$ghost.AutoScaleMode = 'None'
-$null = $ghost.Handle                       # force la création du handle
-[LayeredGhost]::Enable($ghost.Handle)       # active la transparence par pixel
-
-# Capture pixel-fidèle de la fenêtre (inclut le WebBrowser d'aperçu) -> $global:GhostSrc.
-function Capture-FormToGhost {
-    try {
-        $b = $form.Bounds
-        $bmp = New-Object Drawing.Bitmap($b.Width, $b.Height)
-        $g = [Drawing.Graphics]::FromImage($bmp)
-        $g.CopyFromScreen($b.X, $b.Y, 0, 0, $b.Size)
-        $g.Dispose()
-        $old = $global:GhostSrc; $global:GhostSrc = $bmp; if ($old) { $old.Dispose() }
-    } catch { $global:GhostSrc = $null }
-}
-
-# Compose + affiche une frame : capture de l'app redimensionnée ($Dw x $Dh),
-# centrée sur ($Cx,$Cy), avec fondu $Alpha (0-255). Un seul DrawImage bilinéaire
-# par frame pour rester fluide (le fondu passe par l'alpha de la fenêtre).
-function Set-GhostFrame($Cx, $Cy, $Dw, $Dh, $Alpha) {
-    $w = [int][Math]::Max(1, $Dw); $h = [int][Math]::Max(1, $Dh)
-    $bmp = New-Object Drawing.Bitmap($w, $h, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $g = [Drawing.Graphics]::FromImage($bmp)
-    $g.InterpolationMode = 'Bilinear'
-    $g.DrawImage($global:GhostSrc, (New-Object Drawing.Rectangle(0, 0, $w, $h)))
-    $g.Dispose()
-    $x = [int]($Cx - $w / 2.0); $y = [int]($Cy - $h / 2.0)
-    $a = [int]$Alpha; if ($a -lt 0) { $a = 0 } elseif ($a -gt 255) { $a = 255 }
-    [LayeredGhost]::Update($ghost.Handle, $bmp, $x, $y, [byte]$a)
-    $bmp.Dispose()
-}
-
-$slideTimer = New-Object Windows.Forms.Timer
-$slideTimer.Interval = 10
-$slideState = @{ Frame = 0; Total = 14; Hiding = $false
-    AppCx = 0.0; AppCy = 0.0; BubCx = 0.0; BubCy = 0.0; W0 = 1; H0 = 1 }
-$slideTimer.Add_Tick({
-    $slideState.Frame++
-    $t = $slideState.Frame / $slideState.Total
-    if ($t -gt 1) { $t = 1 }
-    if ($slideState.Hiding) {
-        $p = [Math]::Pow($t, 1.9)                       # rétractation : retient puis happe
-    } else {
-        $p = 1.0 - [Math]::Pow(1 - $t, 1.9)             # apparition : jaillit puis se pose
-    }
-    # 'a' = proximité de la bulle (0 = pleine app, 1 = réduite dans la bulle).
-    $a = if ($slideState.Hiding) { $p } else { 1.0 - $p }
-    $scale = 1.0 - 0.96 * $a
-    $alpha = 255.0 * (1.0 - 0.85 * $a)
-    if ($slideState.Hiding) {
-        $cx = $slideState.AppCx + ($slideState.BubCx - $slideState.AppCx) * $p
-        $cy = $slideState.AppCy + ($slideState.BubCy - $slideState.AppCy) * $p
-    } else {
-        $cx = $slideState.BubCx + ($slideState.AppCx - $slideState.BubCx) * $p
-        $cy = $slideState.BubCy + ($slideState.AppCy - $slideState.BubCy) * $p
-    }
-    Set-GhostFrame $cx $cy ($slideState.W0 * $scale) ($slideState.H0 * $scale) $alpha
-    if ($slideState.Frame -ge $slideState.Total) {
-        $slideTimer.Stop()
-        if ($slideState.Hiding) {
-            $global:AppHidden = $true
-            $bubble.Location = $global:BubbleNextPos
-            $global:BubbleLastPos = $global:BubbleNextPos
-            $bubble.TopMost = $true
-            $global:BubbleShownAt = [DateTime]::Now
-            $bubble.Show(); $bubble.BringToFront()
-            $ghost.Hide()
-            # Pas de $bubble.Activate() : après un repli automatique (focus parti vers une
-            # autre app), Windows refuse le premier plan et fait CLIGNOTER le bouton de la
-            # bulle dans la barre des tâches, ce qui « avale » le clic suivant de l'utilisateur.
-        } else {
-            $form.Bounds = $global:AppFullBounds
-            $form.Show()
-            # Une app réduite (barre des tâches) se replie aussi en bulle : on la rétablit.
-            try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
-            $form.Activate()
-            $global:AppHidden = $false
-            $ghost.Hide()
-        }
-    }
-}.GetNewClosure())
-
-function Hide-App {
-    if ($slideTimer.Enabled -or $global:AppHidden) { return }
-    # Résout la position d'apparition de la bulle (mémorisée, sinon défaut bord droit).
-    $bw = $bubble.Width; $bh = $bubble.Height
-    $pos = $global:BubbleLastPos; $valid = $false
-    if ($null -ne $pos) {
-        $vc = New-Object Drawing.Point(($pos.X + [int]($bw / 2)), ($pos.Y + [int]($bh / 2)))
-        if ([Windows.Forms.SystemInformation]::VirtualScreen.Contains($vc)) { $valid = $true }
-    }
-    if (-not $valid) {
-        $wa = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-        $pos = New-Object Drawing.Point(($wa.Right - $bw - 8), [int]($wa.Top + ($wa.Height - $bh) / 2))
-    }
-    $global:BubbleNextPos = $pos
-    $global:AppFullBounds = $form.Bounds
-    Capture-FormToGhost
-    $fb = $global:AppFullBounds
-    if ($null -eq $global:GhostSrc) {
-        # Repli si la capture a échoué : masquage direct sans animation.
-        $global:AppHidden = $true; $form.Hide()
-        $bubble.Location = $pos; $global:BubbleLastPos = $pos
-        $bubble.TopMost = $true; $global:BubbleShownAt = [DateTime]::Now
-        $bubble.Show(); $bubble.BringToFront(); return
-    }
-    $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
-    $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
-    $slideState.BubCx = $pos.X + $bw / 2.0; $slideState.BubCy = $pos.Y + $bh / 2.0
-    $slideState.Frame = 0; $slideState.Hiding = $true
-    # Frame 0 = image pleine et nette => relais sans rupture avec la fenêtre.
-    [LayeredGhost]::Enable($ghost.Handle)
-    Set-GhostFrame $slideState.AppCx $slideState.AppCy $fb.Width $fb.Height 255
-    $ghost.Visible = $true; $ghost.BringToFront()
-    $form.Hide()
-    $slideTimer.Start()
-}
-function Show-App {
-    if (-not $global:AppHidden -or $slideTimer.Enabled) { return }
-    if ($null -eq $global:GhostSrc -or $null -eq $global:AppFullBounds) {
-        # Repli : affichage direct.
-        $bubble.Hide(); if ($global:AppFullBounds) { $form.Bounds = $global:AppFullBounds }
-        $form.Show(); try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
-        $form.Activate(); $global:AppHidden = $false; return
-    }
-    $fb = $global:AppFullBounds
-    $slideState.W0 = $fb.Width; $slideState.H0 = $fb.Height
-    $slideState.AppCx = $fb.X + $fb.Width / 2.0; $slideState.AppCy = $fb.Y + $fb.Height / 2.0
-    $slideState.BubCx = $bubble.Left + $bubble.Width / 2.0; $slideState.BubCy = $bubble.Top + $bubble.Height / 2.0
-    $slideState.Frame = 0; $slideState.Hiding = $false
-    # Frame 0 = tout petit et transparent, au centre de la bulle.
-    [LayeredGhost]::Enable($ghost.Handle)
-    Set-GhostFrame $slideState.BubCx $slideState.BubCy ($fb.Width * 0.04) ($fb.Height * 0.04) 40
-    $bubble.Hide()
-    $ghost.Visible = $true; $ghost.BringToFront()
-    $slideTimer.Start()
-}
-
-$btnHide.Add_Click({ Hide-App })
-
-# Relance pendant que l'app tourne (clic sur l'icône épinglée, le raccourci…) : la
-# nouvelle instance signale l'événement et s'arrête ; ici on ramène la fenêtre (sortie
-# de bulle animée, ou restauration si réduite / derrière d'autres fenêtres).
 function Invoke-AppShowRequest {
-    if ($global:AppHidden) { Show-App; return }
     $form.Show(); try { [AcTaskbar]::RestoreIfMinimized($form.Handle) } catch { }
     $form.Activate()
 }
@@ -2939,78 +2475,6 @@ $showRequestTimer.Add_Tick({
     } catch { Write-AppLog "[UI] Relance : échec ($($_.Exception.Message))" }
 })
 $showRequestTimer.Start()
-
-# ============================================================================
-#  Masquage AUTOMATIQUE : quand l'app perd le focus vers une AUTRE application,
-#  elle se replie en bulle (même animation que le bouton « masquer »). Un timer
-#  mono-coup de 200 ms laisse le nouveau premier plan se stabiliser ; on ne
-#  masque que si sa fenêtre appartient à un autre processus (cf. Should-AutoHide,
-#  lib/Common.ps1). Couvre ainsi dialogues, popup calendrier, tutoriel, bulle.
-#  Désactivable via l'option « Réduction automatique en bulle » (clic droit sur
-#  le bouton « » » ou sur la bulle) — voir Set-AutoHideDisabled plus bas.
-# ============================================================================
-$timerAutoHide = New-Object Windows.Forms.Timer
-$timerAutoHide.Interval = 200
-$timerAutoHide.Add_Tick({
-    $timerAutoHide.Stop()
-    $h = [Win32.Fg]::GetForegroundWindow()
-    $fgPid = [uint32]0
-    if ($h -ne [IntPtr]::Zero) { [void][Win32.Fg]::GetWindowThreadProcessId($h, [ref]$fgPid) }
-    if (Should-AutoHide -AppHidden $global:AppHidden -Animating $slideTimer.Enabled -Suppressed $global:SuppressAutoHide -ForegroundPid ([int]$fgPid) -OwnPid $PID -Disabled $global:AutoHideDisabled) {
-        Hide-App
-    }
-}.GetNewClosure())
-$form.Add_Deactivate({
-    if ($global:AppHidden -or $slideTimer.Enabled -or $global:SuppressAutoHide -or $global:AutoHideDisabled) { return }
-    $timerAutoHide.Stop(); $timerAutoHide.Start()
-}.GetNewClosure())
-# (le clic simple sur la bulle est géré par MouseUp ci-dessus : tap = afficher, glisser = déplacer)
-
-# Clic-DROIT sur la bulle : menu pour afficher ou fermer l'app même en mode masqué
-# (sans ce menu, une app masquée n'a aucun moyen d'être fermée -> instances empilées).
-$bubbleMenu = New-Object Windows.Forms.ContextMenuStrip
-$bubbleMenu.BackColor = $cBgSecondary
-$bubbleMenu.ForeColor = $cTextPrimary
-$bubbleMenu.ShowImageMargin = $false
-$miShow = $bubbleMenu.Items.Add("Afficher l'application")
-$miShow.add_Click({ Show-App })
-$miClose = $bubbleMenu.Items.Add("Fermer l'application")
-$miClose.add_Click({ $global:AppHidden = $false; $bubble.Hide(); $form.Close() })
-$bubble.ContextMenuStrip = $bubbleMenu
-$picBubble.ContextMenuStrip = $bubbleMenu
-
-# ============================================================================
-#  Option « Réduction automatique en bulle » : certains collègues préfèrent garder
-#  la fenêtre visible sur le côté en travaillant dans une autre application. Item
-#  COCHABLE accessible par clic droit sur le bouton « » » ET sur la bulle ; décoché,
-#  l'app ne se replie plus à la perte de focus (le repli manuel via « » » reste
-#  possible). Préférence persistée dans state.json (auto_hide_disabled).
-# ============================================================================
-function Set-AutoHideDisabled([bool]$Disabled) {
-    $global:AutoHideDisabled = $Disabled
-    $global:Ctx.State.AutoHideDisabled = $Disabled
-    # Reflète l'état sur la case à cocher du formulaire (assigner une valeur identique
-    # ne re-déclenche pas CheckedChanged : pas de boucle).
-    try { $chkAutoBulle.Checked = -not $Disabled } catch { }
-    try { Save-AppState $global:Ctx.State } catch { }
-}
-$hideMenu = New-Object Windows.Forms.ContextMenuStrip
-$hideMenu.BackColor = $cBgSecondary
-$hideMenu.ForeColor = $cTextPrimary
-$hideMenu.ShowImageMargin = $false
-$hideMenu.ShowCheckMargin = $true
-$miAutoHideBtn = $hideMenu.Items.Add("Réduction automatique en bulle")
-$miAutoHideBtn.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
-$hideMenu.add_Opening({ $miAutoHideBtn.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
-$btnHide.ContextMenuStrip = $hideMenu
-
-$bubbleMenu.ShowCheckMargin = $true
-[void]$bubbleMenu.Items.Add((New-Object Windows.Forms.ToolStripSeparator))
-$miAutoHideBub = $bubbleMenu.Items.Add("Réduction automatique en bulle")
-$miAutoHideBub.add_Click({ Set-AutoHideDisabled (-not $global:AutoHideDisabled) })
-$bubbleMenu.add_Opening({ $miAutoHideBub.Checked = -not $global:AutoHideDisabled }.GetNewClosure())
-
-$form.Add_FormClosed({ $global:AppClosing = $true; try { $bubble.Close() } catch { }; try { $ghost.Close() } catch { } })
 # Fermeture : libère le WebView2 caché (et ses processus msedgewebview2).
 # Dispose() plutôt que Close() : Close passerait par FormClosing qui re-cache la fenêtre.
 $form.Add_FormClosed({
@@ -3020,8 +2484,8 @@ $form.Add_FormClosed({
     try { if ($global:Snow.Form) { $global:Snow.Form.Dispose() } } catch { }
 })
 
-# Démarrage TOUJOURS centré sur l'écran principal — UNE SEULE fois (sinon le re-Show
-# de la languette recentrerait l'app au lieu de la laisser glisser).
+# Démarrage TOUJOURS centré sur l'écran principal — UNE SEULE fois (un re-Show après
+# relance ne doit pas déplacer la fenêtre).
 $global:AppFirstShown = $false
 $form.Add_Shown({
     if ($global:AppFirstShown) { return }
@@ -3034,6 +2498,5 @@ $form.Add_Shown({
     } catch { }
 })
 
-# Boucle principale : Application::Run (et non ShowDialog) pour que la languette
-# reste active à côté de la fenêtre principale.
+# Boucle principale : Application::Run (et non ShowDialog).
 [Windows.Forms.Application]::Run($form)

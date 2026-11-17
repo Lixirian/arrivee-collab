@@ -1,11 +1,12 @@
 ﻿{
-    "version":  "1.14.5",
-    "zip":  "Arrivee-Collab_version1.14.5.zip",
-    "sha256":  "EDE0608A7984C295AB9C49DC063C9AEF1DF96B3733037593BFEDA6AC70BAECFC",
-    "sig":  "F0BjAexPU17XuMD5eUB8RP3CfBNE8NEfkbueKl7AbLoV77o+S51PZw3RyhSWaJSAmTkxE18ixdaNEwBiDxK2GBZGAt2S4ocYxF0z5K7wFXbNO9CFkFV/5D85EM9hE1KZEK5gOmgl3vzpLLzXd34CUvFU54ElkQNA/AEbTsUPDRR2vtX/2TQRKt1TXsiwpzfFqRrrcP+mI+aWbEdl0NZCLF6H7UvyItjhNeOijR/51TNCTuQcMWMF6dsM5Zk8e4pFVeeDgw4BEmYEHTchPTM9rzHS643hy3TQLJ90AoqjAlibhDNChTBxogwhT/yGeORNt4PYvA9lKhAItm+OlJsnTL4ajC2hgbIA0SfYf87HgPLIyirQusqRXoV2BAIFP/t1J4HlTkl4uHXYHAxmTVOpZS4No3Dlu/gkKUjJ+Ejvm/Pb4JxDVza4OQRZ8M+WvjGrCnfyTHL/NPphUaloadF4IQu+phLJGzeL8FA+0tNYCwH5mclAeRnMWALF019Hhfsy",
-    "msig":  "LVK3gBKLTodomUKXUYlUp8wAOCFlVHeg3PRRm0Mxkyg2MMUnzU1Z02AI3UNEsDZvgqCr+UCovtMzWzj5M1NlkC3VgQZNwFyfR2Zw+Xub6tij/ZnHA4y6A32Oyu3/MQt11nwmBNXjPfItnhi2WpYruSz/XKIXYXZWnzXQ+YcskgIHlNyHQSQFv7okfcBLkPVW+Coq+rnHyiK8HcPzsEh7SPJtXHSKMXMcLU0kRst8ySyLtUyKGx+lm+1ad5sJgD+pAdpz/m6ArPBi/9IYiF5HGgQP5MjQu3L7mDzolnosd/lUoliupOHhJsP3s5l7hImVMBbQ+R5LY0gmv2qhzf7rB4xLL09QLRk561zcBvGqQIjKLUicUMgvMTF8tn2Nc0FL2i2Ivhr7MeRv+n6z/ZkzmWR5h8xyp+Z5yTeuPezXIC97Z/Y0Z0y6HAUXRlhjp3LJm8KQUw/428UcZYrBuF+Z28psGhyRoTEHYqR2Dm0N5I295w9wHTiKoPMt8TV2KBwj",
+    "version":  "1.15.0",
+    "zip":  "Arrivee-Collab_version1.15.0.zip",
+    "sha256":  "5FF8422F2AC5FF4464E12AFDBAED3C87FABFE3A9FBF87CB0F028779F8D40FD2A",
+    "sig":  "q0t5AOvoBIY5lIT9kaiwZ4JBGi/fZ4xTmer8wvuP7VTwrKGjNiJmrhKIJgK8GYzDQvlhS5+49cN9Ug9xqKgYdHUHFAjtY1Hdz7NlJlCJRdNMYqMMA5o8NOLlnUU0xULeMbSg0BKXmNRGwYDS1Pw0+VOi+sLI06r2yLihJ7eLOGanKzK3pbnjJhl4KdywES7CvR/9t+OGPz81Ogxdloq7FOzv53q4//+x5SP6OULIWDcRqu0d8aLaIGN4DIzZhJtxHvR0dTM6gXCGB5opPD9je72wtMtyklHJqGuMEe24MZ6ibzzOQCVh2uJ4Ht7S0q4OLmgQUyQxnD3y4TBqhQR1EA9kuFYVJwOqtEvMh1tuuhkpdirNHTaTQbrP2Cc6Zz5RFNUDITSGsNTJpK0+c78KhbjYbefKHKGPzFlk+4YLFFVaHUPzEMs4u3uk2PHysLYon1JQDoq7qSgGNpzN1ZddtGAQnzP8fvBwh/PM8IoLtwjw5iy0LzQRQo7AcoryQom6",
+    "msig":  "hk0Czocp4RW/H5sp/SfKCz4D7cP0k9RyrkYhZsMQbz+/UUFKdWNhT4l1Prk7Iqeu7zGc2tx52xwypbiYCheNkPqdt2O1tG/OKkEVyRsCSClzNzYGMbGLpWKp63kcLCTbfI89z6FYWTXE2jufaOxgIJI9dGPDGpohmyYc3DvIf13GQRS+kR+9a3quVgJKNRPQf0ZCst6K24fbV2CVuoVRt6cbCNUzvufOXE2PjmiIOgF9SBAzfwBEwFP7nBf5lObg5y9OW7BVUM7VVBzSicQWc4wyml7zgXqEQjKX+ifpFRfVoIhySxTbX5ECV5+7RzDxReVQTSt0R0vZlgSOEsXXsF07xZZYgOtJA4IEXkVLyL1w4dL6xqeQNemo3HJX1dy0mKne/x3Zzr68VIC5strEKsz+WI5cqirhz4gLpArCM01fLkEIOqyyY7JkJEuBNn06K53L5sG4IYuafo+n3Zdvpj7I5ijuXZiiEFbMQD2u32YtREGfT/8XCjd1hp1V4+kj",
     "date":  "2026-11-17",
     "notes":  [
-                  "Barre des tâches : un seul clic sur l\u0027icône (ou sur sa miniature) suffit désormais pour ramener l\u0027outil replié en bulle."
+                  "Retour à une fenêtre classique : la bulle et le repli automatique sont supprimés. L\u0027outil se réduit normalement dans la barre des tâches et un seul clic sur son icône le ramène.",
+                  "Relancer l\u0027outil alors qu\u0027il est déjà ouvert (icône épinglée, raccourci) ramène simplement la fenêtre existante : plus de seconde fenêtre, même en cliquant plusieurs fois rapidement."
               ]
 }
