@@ -82,6 +82,45 @@ public class DarkTitleBar {
     }
 }
 "@
+# --- Épinglage dans la barre des tâches (même mécanisme que Biblio-Tech / SNOW Widget) ---
+# Sans propriétés de relance, Windows épingle le PROCESSUS : powershell.exe nu (icône
+# PowerShell, console vide à la relance). On pose sur la fenêtre principale
+# System.AppUserModel.RelaunchCommand / RelaunchIconResource / RelaunchDisplayNameResource
+# puis System.AppUserModel.ID : l'épingle garde l'icône de l'app et relance le lanceur.
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class AcTaskbar {
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct PROPERTYKEY { public Guid fmtid; public uint pid; }
+    [StructLayout(LayoutKind.Explicit)]
+    public struct PROPVARIANT { [FieldOffset(0)] public ushort vt; [FieldOffset(8)] public IntPtr p; [FieldOffset(16)] public long pad; }
+    [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPropertyStore {
+        [PreserveSig] int GetCount(out uint c);
+        [PreserveSig] int GetAt(uint i, out PROPERTYKEY k);
+        [PreserveSig] int GetValue(ref PROPERTYKEY k, out PROPVARIANT v);
+        [PreserveSig] int SetValue(ref PROPERTYKEY k, ref PROPVARIANT v);
+        [PreserveSig] int Commit();
+    }
+    [DllImport("shell32.dll")] static extern int SHGetPropertyStoreForWindow(IntPtr hwnd, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IPropertyStore ps);
+    [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT pv);
+    static readonly Guid FMT = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");   // System.AppUserModel.*
+    static void Set(IPropertyStore ps, uint pid, string val) {
+        PROPERTYKEY k = new PROPERTYKEY(); k.fmtid = FMT; k.pid = pid;
+        PROPVARIANT v = new PROPVARIANT(); v.vt = 31; v.p = Marshal.StringToCoTaskMemUni(val);   // VT_LPWSTR
+        try { int hr = ps.SetValue(ref k, ref v); if (hr != 0) Marshal.ThrowExceptionForHR(hr); } finally { PropVariantClear(ref v); }
+    }
+    // pid : 2 RelaunchCommand, 3 RelaunchIconResource, 4 RelaunchDisplayNameResource, 5 ID (posé en dernier).
+    public static void Apply(IntPtr hwnd, string appId, string command, string name, string icon) {
+        Guid iid = new Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"); IPropertyStore ps;
+        int hr = SHGetPropertyStoreForWindow(hwnd, ref iid, out ps);
+        if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+        try { Set(ps, 2, command); Set(ps, 4, name); if (!String.IsNullOrEmpty(icon)) Set(ps, 3, icon); Set(ps, 5, appId); ps.Commit(); }
+        finally { Marshal.ReleaseComObject(ps); }
+    }
+}
+"@
 try { [DarkTitleBar]::EnableAppDarkMode() } catch {}
 try { [DarkTitleBar]::SetAppId("SNCF.ArriveeCollaborateur") } catch {}
 try { [DarkTitleBar]::HookCalendarPopup() } catch {}
@@ -1082,6 +1121,16 @@ $form.Add_Shown({
         [DarkTitleBar]::ApplyDarkScrollbar($rtbCopy.Handle)
         [DarkTitleBar]::ApplyDarkScrollbar($rtbMsg.Handle)
     } catch {}
+})
+# Épinglage : propriétés posées dès la création du handle (Hide/Show du repli en bulle
+# ne recrée pas le handle, elles restent donc valables toute la session).
+$form.Add_HandleCreated({
+    try {
+        $cmd = Get-AppRelaunchCommand -AppRoot $baseDir -DataDir $dataDir
+        if (-not $cmd) { Write-AppLog "[UI] Épinglage : aucun lanceur trouvé, propriétés non posées"; return }
+        $ico = if (Test-Path -LiteralPath $iconPath) { "$iconPath,0" } else { '' }
+        [AcTaskbar]::Apply($this.Handle, 'SNCF.ArriveeCollaborateur', $cmd, 'Arrivée Collab', $ico)
+    } catch { Write-AppLog "[UI] Épinglage : échec ($($_.Exception.Message))" }
 })
 
 # --- Barre d'accent violette ---

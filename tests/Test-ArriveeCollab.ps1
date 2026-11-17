@@ -338,6 +338,12 @@ try {
     Set-Content -LiteralPath (Join-Path $lchApp 'launcher\bootstrap.ps1') -Value 'v2'
     [void](Sync-AppLauncher -AppRoot $lchApp -DataDir $lchTmp)
     Assert ((Get-Content -LiteralPath (Join-Path $lchTmp 'launcher\bootstrap.ps1')) -eq 'v2') 'lanceur : remplace apres une mise a jour'
+    $rl = Get-AppRelaunchCommand -AppRoot $lchApp -DataDir $lchTmp
+    Assert ($rl -like '*wscript.exe" "*launcher\Arrivee Collab.vbs"') 'epinglage : relance via le lanceur local'
+    Remove-Item -LiteralPath (Join-Path $lchTmp 'launcher') -Recurse -Force
+    Assert ($null -eq (Get-AppRelaunchCommand -AppRoot $lchApp -DataDir $lchTmp)) 'epinglage : aucun lanceur -> $null'
+    Set-Content -LiteralPath (Join-Path $lchApp 'Start-ArriveeCollab.vbs') -Value 'x'
+    Assert ((Get-AppRelaunchCommand -AppRoot $lchApp -DataDir $lchTmp) -like '*Start-ArriveeCollab.vbs"') 'epinglage : repli sur le lanceur de dev'
 } finally { Remove-Item -LiteralPath $lchTmp -Recurse -Force -ErrorAction SilentlyContinue }
 
 $bsPath = Join-Path $PSScriptRoot '..\dist-launcher\bootstrap.ps1'

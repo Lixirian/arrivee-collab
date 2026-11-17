@@ -42,6 +42,19 @@ function Sync-AppLauncher {
     return $true
 }
 
+# Commande de relance posée sur la fenêtre pour l'épinglage dans la barre des tâches.
+# Sans elle, Windows épingle le PROCESSUS (powershell.exe nu). Priorité au lanceur local
+# (%LOCALAPPDATA%\Arrivee-Collab\launcher, même cible que les raccourcis) ; à défaut
+# (sources de dev), le lanceur Start-ArriveeCollab.vbs de l'app. $null si aucun.
+function Get-AppRelaunchCommand {
+    param([string]$AppRoot, [string]$DataDir)
+    $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
+    foreach ($vbs in @((Join-Path $DataDir 'launcher\Arrivee Collab.vbs'), (Join-Path $AppRoot 'Start-ArriveeCollab.vbs'))) {
+        if (Test-Path -LiteralPath $vbs) { return ('"{0}" "{1}"' -f $wscript, $vbs) }
+    }
+    return $null
+}
+
 # Comparaison NUMÉRIQUE de deux versions "x.y.z" (1.0.10 > 1.0.2). Renvoie -1 / 0 / 1.
 function Compare-AppVersion {
     param([string]$A, [string]$B)
